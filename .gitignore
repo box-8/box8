@@ -1,6 +1,6 @@
 # Sharepoint
 box8-fastapi/sharepoint/
-
+db/
 # Dependencies
 node_modules/
 /venv/

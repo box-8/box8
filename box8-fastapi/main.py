@@ -145,15 +145,23 @@ async def designer_delete_diagram(filename: str):
 @app.post("/designer/launch-crewai")
 async def designer_launch_crewai(request: Request):
     """Lance le processus CrewAI à partir d'un diagramme"""
+    session = request.cookies.get("session")
+    if not session:
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    
+    user = get_user_from_token(session)
+    if not user:
+        raise HTTPException(status_code=401, detail="Session invalide")
+
     try:
         data = await request.json()
-        folder = get_absolute_path('sharepoint/designer')
+        user_folder = get_user_folder(user.email)
         llm = data.get('llm', 'openai')
         
-        if not os.path.exists(folder):
-            os.makedirs(folder)
+        if not os.path.exists(user_folder):
+            os.makedirs(user_folder)
             
-        result = execute_process_from_diagram(data, folder, llm)
+        result = execute_process_from_diagram(data, user_folder, llm)
         return JSONResponse(result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
