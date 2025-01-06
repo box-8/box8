@@ -1,0 +1,16 @@
+fastapi
+fastapi-sessions
+uvicorn
+python-multipart
+pydantic
+pydantic-extra-types
+pydantic[email]
+python-jose[cryptography]
+passlib[bcrypt]
+websockets
+crewai
+crewai-tools
+networkx
+chromadb
+PyPDF2
+python-docx
