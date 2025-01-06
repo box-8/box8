@@ -115,7 +115,7 @@ def generate_diagram_from_description(description: str, name: str = "Nouveau Dia
     """
     Génère un diagramme à partir d'une description textuelle en utilisant CrewAI
     """
-    production = False
+    production = True
     if production:
         # Créer l'agent expert en conception de diagrammes
         diagram_expert = Agent(

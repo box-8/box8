@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Button, Form } from 'react-bootstrap';
 
-const DiagramModal = ({ show, handleClose, onSave, initialData = {} }) => {
+const DiagramModal = ({ show, handleClose, onSave, onDelete, initialData = {} }) => {
   const [diagramName, setDiagramName] = useState('');
   const [description, setDescription] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (show && initialData) {
-      setDiagramName(initialData.name || '');
-      if (!description) {
-        setDescription(initialData.description || '');
-      }
+      // Enlever l'extension .json si présente
+      const displayName = initialData.name ? initialData.name.replace(/\.json$/, '') : '';
+      setDiagramName(displayName);
+      setDescription(initialData.description || '');
     }
   }, [show, initialData]);
 
@@ -23,11 +24,41 @@ const DiagramModal = ({ show, handleClose, onSave, initialData = {} }) => {
     handleClose();
   };
 
+  const handleDelete = async () => {
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce diagramme ?')) {
+      setIsDeleting(true);
+      try {
+        // S'assurer que le nom du fichier a l'extension .json
+        const fileName = initialData.name.endsWith('.json') 
+          ? initialData.name 
+          : `${initialData.name}.json`;
+
+        const response = await fetch(`http://localhost:8000/designer/delete-diagram/${fileName}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.detail || 'Erreur lors de la suppression du diagramme');
+        }
+
+        onDelete && onDelete();
+        handleClose();
+      } catch (error) {
+        console.error('Erreur:', error);
+        alert(error.message);
+      } finally {
+        setIsDeleting(false);
+      }
+    }
+  };
+
   return (
     <Modal show={show} onHide={handleClose}>
       <Modal.Header closeButton>
         <Modal.Title>
-          {initialData.id ? 'Modifier le Diagramme' : 'Nouveau Diagramme'}
+          {initialData.id ? 'Modifier le Diagramme' : 'Editer le Diagramme'}
         </Modal.Title>
       </Modal.Header>
       
@@ -58,6 +89,16 @@ const DiagramModal = ({ show, handleClose, onSave, initialData = {} }) => {
       </Modal.Body>
 
       <Modal.Footer>
+        {initialData.name && (
+          <Button 
+            variant="danger" 
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="me-auto"
+          >
+            {isDeleting ? 'Suppression...' : 'Supprimer'}
+          </Button>
+        )}
         <Button variant="secondary" onClick={handleClose}>
           Annuler
         </Button>

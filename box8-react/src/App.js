@@ -76,7 +76,7 @@ function Flow() {
   const [currentDiagramName, setCurrentDiagramName] = useState('');
   const [currentDiagramDescription, setCurrentDiagramDescription] = useState('');
   const [isNewDiagram, setIsNewDiagram] = useState(false);
-  const { fitView } = useReactFlow();
+  const { fitView, getNodes, getEdges } = useReactFlow();
 
   // État pour suivre si le diagramme a été chargé initialement
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -262,7 +262,13 @@ function Flow() {
 
   const handleLoadDiagram = (diagramData, fileName) => {
     console.log('Diagram Data:', diagramData);
+    console.log('File Name:', fileName);
+    
     setCurrentDiagramName(fileName);
+    if (diagramData.description) {
+      setCurrentDiagramDescription(diagramData.description);
+    }
+    
     if (diagramData.nodes && diagramData.links) {
       console.log('Nodes:', diagramData.nodes);
       console.log('Links:', diagramData.links);
@@ -491,50 +497,78 @@ function Flow() {
     setShowNewDiagramModal(false);
   };
 
-  const handleSaveDiagram = (data) => {
-    // Préparer les données du diagramme
-    const diagramContent = {
-      name: data.name,
-      description: data.description || currentDiagramDescription,
-      nodes: nodes.map(node => ({
+  const handleSaveDiagram = async (diagramData) => {
+    try {
+      // S'assurer que le nom du fichier a l'extension .json
+      const fileName = diagramData.name.endsWith('.json')
+        ? diagramData.name
+        : `${diagramData.name}.json`;
+
+      // Préparer les données du diagramme
+      const nodes = getNodes().map(node => ({
         key: node.id,
-        ...node.data
-      })),
-      links: edges.map(edge => ({
+        type: node.type,
+        role: node.data.role,
+        goal: node.data.goal,
+        backstory: node.data.backstory,
+        tools: node.data.tools,
+        file: node.data.file,
+        position: node.position
+      }));
+
+      const edges = getEdges().map(edge => ({
+        id: edge.id,
         from: edge.source,
         to: edge.target,
-        ...edge.data
-      }))
-    };
+        description: edge.data?.description,
+        expected_output: edge.data?.expectedOutput,
+        relationship: edge.data?.relationship
+      }));
 
-    // Envoyer la requête au serveur
-    fetch('http://localhost:8000/designer/save-diagram', {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        name: data.name,
-        description: data.description || currentDiagramDescription,
-        diagram: JSON.stringify(diagramContent)
-      })
-    })
-    .then(response => {
+      const diagramJson = {
+        name: diagramData.name,
+        description: diagramData.description,
+        nodes: nodes,
+        links: edges
+      };
+
+      const response = await fetch('http://localhost:8000/designer/save-diagram', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          name: fileName,
+          diagram: JSON.stringify(diagramJson)
+        })
+      });
+
       if (!response.ok) {
-        throw new Error('Erreur lors de la sauvegarde du diagramme');
+        const data = await response.json();
+        throw new Error(data.detail || 'Erreur lors de la sauvegarde');
       }
-      return response.json();
-    })
-    .then(() => {
-      setCurrentDiagramName(data.name);
-      setCurrentDiagramDescription(data.description || currentDiagramDescription);
+
+      setCurrentDiagramName(fileName);
+      setCurrentDiagramDescription(diagramData.description);
+
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde:', error);
+      alert(error.message);
+    }
+  };
+
+  const handleDeleteDiagram = async () => {
+    try {
+      setNodes([]);
+      setEdges([]);
+      setCurrentDiagramName('');
+      setCurrentDiagramDescription('');
       setShowDiagramModal(false);
-    })
-    .catch(error => {
-      console.error('Erreur:', error);
-      alert('Erreur lors de la sauvegarde du diagramme: ' + error.message);
-    });
+    } catch (error) {
+      console.error('Erreur lors de la suppression du diagramme:', error);
+      alert(error.message);
+    }
   };
 
   // Gestionnaire de sélection des nœuds
@@ -576,30 +610,34 @@ function Flow() {
   }, [setNodes]);
 
   // Gestionnaire d'appui sur les touches
-  const onKeyDown = useCallback((event) => {
-    if (event.key === 'Delete' || event.key === 'Backspace') {
-      if (selectedNode && selectedNode.id !== 'output') { // Empêcher la suppression du nœud output
-        setNodes((nodes) => nodes.filter((n) => n.id !== selectedNode.id));
-        // Supprimer également les edges connectés au nœud
-        setEdges((edges) => edges.filter((e) => 
-          e.source !== selectedNode.id && e.target !== selectedNode.id
-        ));
-        setSelectedNode(null);
-      }
-      if (selectedEdge) {
-        setEdges((edges) => edges.filter((e) => e.id !== selectedEdge.id));
-        setSelectedEdge(null);
-      }
-    }
-  }, [selectedNode, selectedEdge, setNodes, setEdges]);
-
-  // Ajouter l'écouteur d'événements pour les touches
   useEffect(() => {
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.removeEventListener('keydown', onKeyDown);
+    const handleKeyDown = (event) => {
+      const { key } = event;
+
+      // Ne pas traiter les touches si une modale est ouverte
+      if (showAgentModal || showTaskModal || showDiagramModal || showNewDiagramModal || showJsonFilesModal || showResponseModal) {
+        return;
+      }
+
+      if (key === 'Delete' || key === 'Backspace') {
+        if (selectedNode && selectedNode.id !== 'output') { // Empêcher la suppression du nœud output
+          setNodes((nodes) => nodes.filter((n) => n.id !== selectedNode.id));
+          // Supprimer également les edges connectés au nœud
+          setEdges((edges) => edges.filter((e) => 
+            e.source !== selectedNode.id && e.target !== selectedNode.id
+          ));
+          setSelectedNode(null);
+        }
+        if (selectedEdge) {
+          setEdges((edges) => edges.filter((e) => e.id !== selectedEdge.id));
+          setSelectedEdge(null);
+        }
+      }
     };
-  }, [onKeyDown]);
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [nodes, edges, showAgentModal, showTaskModal, showDiagramModal, showNewDiagramModal, showJsonFilesModal, showResponseModal, selectedNode, selectedEdge, setNodes, setEdges]);
 
   // Effet pour le chargement initial du diagramme
   useEffect(() => {
@@ -682,6 +720,15 @@ function Flow() {
         onLoadDiagram={() => setShowJsonFilesModal(true)}
         onCreateCrewAI={handleCreateCrewAI}
         onNewDiagram={handleNewDiagram}
+        onNewDiagramClick={() => setShowNewDiagramModal(true)}
+        onOpenDiagramClick={() => setShowJsonFilesModal(true)}
+        onSaveDiagramClick={() => setShowDiagramModal(true)}
+        onShowResponseClick={() => setShowResponseModal(true)}
+        isAuthenticated={isAuthenticated}
+        onLoginClick={() => setShowLoginModal(true)}
+        onProfileClick={() => setShowProfileModal(true)}
+        user={user}
+        hasDiagram={currentDiagramName !== ''}
       />
 
       <AgentModal
@@ -713,6 +760,7 @@ function Flow() {
         show={showDiagramModal}
         handleClose={() => setShowDiagramModal(false)}
         onSave={handleSaveDiagram}
+        onDelete={handleDeleteDiagram}
         initialData={{ name: currentDiagramName, description: currentDiagramDescription }}
       />
 

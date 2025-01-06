@@ -52,6 +52,8 @@ const DiagramModalNew = ({ show, handleClose, onSave, handleLoadDiagram }) => {
       // Générer le diagramme dans React Flow
       handleLoadDiagram(emptyDiagram, formData.name);
 
+      
+      /*
       // Sauvegarder le diagramme vierge
       const saveResponse = await fetch('http://localhost:8000/designer/save-diagram', {
         method: 'POST',
@@ -74,6 +76,7 @@ const DiagramModalNew = ({ show, handleClose, onSave, handleLoadDiagram }) => {
         const data = await saveResponse.json();
         throw new Error(data.detail || 'Erreur lors de la sauvegarde du diagramme');
       }
+      */
 
       onSave({
         name: formData.name,
@@ -112,15 +115,14 @@ const DiagramModalNew = ({ show, handleClose, onSave, handleLoadDiagram }) => {
       const diagramData = await generateResponse.json();
       console.log(diagramData);
 
-      // Générer le diagramme dans React Flow
-      handleLoadDiagram(diagramData, formData.name);
+      // S'assurer que le nom du fichier a l'extension .json
+      const fileName = formData.name.endsWith('.json')
+        ? formData.name
+        : `${formData.name}.json`;
 
-      /*
-      onSave({
-        name: formData.name,
-        description: formData.description
-      });
-      */
+      // Générer le diagramme dans React Flow
+      handleLoadDiagram(diagramData, fileName);
+
       closeModal();
     } catch (err) {
       console.error('Erreur:', err);
