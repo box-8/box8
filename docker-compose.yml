@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  frontend:
+    build: 
+      context: ./box8-react
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+
+  backend:
+    build: 
+      context: ./box8-fastapi
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./box8-fastapi:/app
+      - ./data:/app/data
+    environment:
+      - SECRET_KEY=votre_clé_secrète_très_longue_et_complexe
+      - ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
