@@ -23,7 +23,7 @@ const TaskModal = ({ show, onHide, onAdd, onUpdate, onDelete, selectedEdge, node
         from: selectedEdge.source,
         to: selectedEdge.target,
         description: selectedEdge.data?.description || '',
-        expectedOutput: selectedEdge.data?.expectedOutput || '',
+        expectedOutput: selectedEdge.data?.expected_output || '',
         type: selectedEdge.data?.type || ''
       });
     } else {

@@ -14,3 +14,4 @@ networkx
 chromadb
 PyPDF2
 python-docx
+aiofiles

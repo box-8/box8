@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Button, ListGroup } from 'react-bootstrap';
 
-const JsonFilesModal = ({ show, handleClose, onFileSelect }) => {
+const JsonFilesModal = ({ 
+  show, 
+  handleClose, 
+  onFileSelect, 
+  onNewDiagram,
+  reactFlowInstance 
+}) => {
   const [files, setFiles] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileContent, setFileContent] = useState(null);
@@ -52,6 +58,12 @@ const JsonFilesModal = ({ show, handleClose, onFileSelect }) => {
       .then(data => {
         onFileSelect(data, filename);
         handleClose();
+        // Ajout du fitView après un court délai pour laisser le temps au diagramme de se charger
+        setTimeout(() => {
+          if (reactFlowInstance?.fitView) {
+            reactFlowInstance.fitView({ padding: 0.2 });
+          }
+        }, 100);
       })
       .catch(error => console.error('Error loading file content:', error));
   };
@@ -61,6 +73,12 @@ const JsonFilesModal = ({ show, handleClose, onFileSelect }) => {
       console.log(fileContent);
       onFileSelect(fileContent, selectedFile);
       handleClose();
+      // Ajout du fitView après un court délai pour laisser le temps au diagramme de se charger
+      setTimeout(() => {
+        if (reactFlowInstance?.fitView) {
+          reactFlowInstance.fitView({ padding: 0.2 });
+        }
+      }, 100);
     }
   };
 
@@ -94,14 +112,31 @@ const JsonFilesModal = ({ show, handleClose, onFileSelect }) => {
   };
 
   return (
-    <Modal show={show} onHide={handleClose} size="lg">
+    <Modal 
+      show={show} 
+      onHide={handleClose}
+      size="xl"
+    >
       <Modal.Header closeButton>
         <Modal.Title>Load Diagram</Modal.Title>
       </Modal.Header>
       <Modal.Body style={{ maxHeight: 'calc(90vh - 200px)', overflow: 'hidden' }}>
         <div className="row" style={{ height: '100%' }}>
           <div className="col-md-6" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <h5>Available Diagrams</h5>
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h5 className="m-0">Available Diagrams</h5>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  handleClose();
+                  onNewDiagram();
+                }}
+                title="New Diagram"
+              >
+                <i className="bi bi-file-earmark-plus"></i> New
+              </Button>
+            </div>
             <ListGroup 
               style={{ 
                 flexGrow: 1,

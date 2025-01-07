@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Button, Form } from 'react-bootstrap';
 
-const DiagramModal = ({ show, handleClose, onSave, onDelete, initialData = {} }) => {
+const DiagramModal = ({ 
+  show, 
+  handleClose, 
+  onSave, 
+  onDelete, 
+  onRefresh,
+  initialData = {} 
+}) => {
   const [diagramName, setDiagramName] = useState('');
   const [description, setDescription] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
@@ -55,7 +62,11 @@ const DiagramModal = ({ show, handleClose, onSave, onDelete, initialData = {} })
   };
 
   return (
-    <Modal show={show} onHide={handleClose}>
+    <Modal 
+      show={show} 
+      onHide={handleClose}
+      size="xl"
+    >
       <Modal.Header closeButton>
         <Modal.Title>
           {initialData.id ? 'Modifier le Diagramme' : 'Editer le Diagramme'}
@@ -90,14 +101,24 @@ const DiagramModal = ({ show, handleClose, onSave, onDelete, initialData = {} })
 
       <Modal.Footer>
         {initialData.name && (
-          <Button 
-            variant="danger" 
-            onClick={handleDelete}
-            disabled={isDeleting}
-            className="me-auto"
-          >
-            {isDeleting ? 'Suppression...' : 'Supprimer'}
-          </Button>
+          <>
+            <Button 
+              variant="danger" 
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="me-auto"
+            >
+              {isDeleting ? 'Suppression...' : 'Supprimer'}
+            </Button>
+            <Button
+              variant="success"
+              onClick={onRefresh}
+              title="Refresh Current Diagram"
+              className="me-2"
+            >
+              <i className="bi bi-arrow-clockwise"></i> Refresh
+            </Button>
+          </>
         )}
         <Button variant="secondary" onClick={handleClose}>
           Annuler

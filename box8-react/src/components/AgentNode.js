@@ -4,6 +4,13 @@ import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
 import Tooltip from 'react-bootstrap/Tooltip';
 
 const AgentNode = ({ data }) => {
+  // Fonction pour tronquer le texte aux premiers mots
+  const truncateText = (text, wordCount = 10) => {
+    const words = text.split(' ');
+    if (words.length <= wordCount) return text;
+    return words.slice(0, wordCount).join(' ') + '...';
+  };
+
   const renderTooltip = (props) => (
     <Tooltip id={`agent-tooltip-${data.id}`} {...props}>
       <div className="text-start">
@@ -30,9 +37,9 @@ const AgentNode = ({ data }) => {
       >
         <div className="agent-content">
           <h6>{data.role}</h6>
-          <p>{data.goal}</p>
-          <p>{data.backstory}</p>
-          <p>{data.file}</p>
+          <p>{truncateText(data.goal, 8)}</p>
+          <p>{truncateText(data.backstory, 8)}</p>
+          {data.file && <p className="file-path">{data.file.split('/').pop()}</p>}
         </div>
       </OverlayTrigger>
       <Handle type="source" position={Position.Bottom} style={{ 

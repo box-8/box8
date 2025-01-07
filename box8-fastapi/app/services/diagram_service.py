@@ -1,5 +1,6 @@
 import os
 import json
+import aiofiles
 from typing import Dict, List, Optional
 from crewai import Agent, Crew, Task, Process
 from ..utils.crewai_functions import choose_llm, choose_tool, reset_chroma
@@ -11,9 +12,9 @@ GREEN = '\033[32m'
 MAGENTA = '\033[35m'
 END = '\033[0m'
 
-def crewai_summarize_if_not_exists(pdf: str, pages: int = 6, history: Optional[str] = None, llm: str = "openai") -> str:
+async def crewai_summarize_if_not_exists(pdf: str, pages: int = 6, history: Optional[str] = None, llm: str = "openai") -> str:
     """
-    Récupère ou génère le résumé d'un document PDF.
+    Récupère ou génère le résumé d'un document PDF de manière asynchrone.
     
     Args:
         pdf (str): Chemin vers le fichier PDF
@@ -27,18 +28,18 @@ def crewai_summarize_if_not_exists(pdf: str, pages: int = 6, history: Optional[s
     txt_path = f"{pdf}.txt"
     if os.path.exists(txt_path):
         try:
-            with open(txt_path, "r", encoding="utf-8") as file:
-                return file.read()
+            async with aiofiles.open(txt_path, "r", encoding="utf-8") as file:
+                return await file.read()
         except Exception as e:
             print(f"Erreur lors de la lecture du fichier : {e}")
-            return crewai_summarize(pdf, pages=pages, history=history, llm=llm)
+            return await crewai_summarize(pdf, pages=pages, history=history, llm=llm)
     else:
         print(f"Le fichier {pdf} n'existe pas, on le génère.")
-        return crewai_summarize(pdf, pages=pages, history=history, llm=llm)
+        return await crewai_summarize(pdf, pages=pages, history=history, llm=llm)
 
-def crewai_summarize(pdf: str, pages: int = 6, history: Optional[str] = None, llm: str = "openai") -> str:
+async def crewai_summarize(pdf: str, pages: int = 6, history: Optional[str] = None, llm: str = "openai") -> str:
     """
-    Génère un résumé d'un document PDF en utilisant CrewAI.
+    Génère un résumé d'un document PDF en utilisant CrewAI de manière asynchrone.
     
     Args:
         pdf (str): Chemin vers le fichier PDF
@@ -49,7 +50,7 @@ def crewai_summarize(pdf: str, pages: int = 6, history: Optional[str] = None, ll
     Returns:
         str: Résumé généré par CrewAI
     """
-    firstpages = extract_page_text_from_file(src=pdf)
+    firstpages = await extract_page_text_from_file(src=pdf)
     try:
         content = "\n".join(firstpages[:int(pages)])
     except ValueError:
@@ -102,18 +103,26 @@ def crewai_summarize(pdf: str, pages: int = 6, history: Optional[str] = None, ll
         )
     ]
 
-    # Création et exécution de l'équipe
+    # Création et exécution du crew
     crew = Crew(
         agents=list(agents.values()),
-        tasks=tasks
+        tasks=tasks,
+        process=Process.sequential
     )
 
-    result = crew.kickoff()
-    return result.raw
+    result = await crew.kickoff_async()
+    result_str = result.raw
 
-def generate_diagram_from_description(description: str, name: str = "Nouveau Diagramme") -> Dict:
+    # Sauvegarde du résultat
+    txt_path = f"{pdf}.txt"
+    async with aiofiles.open(txt_path, "w", encoding="utf-8") as file:
+        await file.write(result_str)
+
+    return result_str
+
+async def generate_diagram_from_description(description: str, name: str = "Nouveau Diagramme") -> Dict:
     """
-    Génère un diagramme à partir d'une description textuelle en utilisant CrewAI
+    Génère un diagramme à partir d'une description textuelle en utilisant CrewAI de manière asynchrone.
     """
     production = True
     if production:
@@ -158,6 +167,7 @@ def generate_diagram_from_description(description: str, name: str = "Nouveau Dia
             description=f"""À partir de l'analyse du workflow, créez une structure de diagramme avec :
             1. Des nœuds représentant les agents avec leurs propriétés
             2. Des liens représentant les tâches/relations entre les agents
+            Les références circulaires sont proscrites.
             
             La sortie doit être une structure JSON valide suivant ce format :
             {{
@@ -198,7 +208,7 @@ def generate_diagram_from_description(description: str, name: str = "Nouveau Dia
             verbose=True
         )
 
-        kickoff = crew.kickoff()
+        kickoff = await crew.kickoff_async()
         result = kickoff.raw
     else:
         # Exemple de diagramme de tâches et d'agents
@@ -279,9 +289,9 @@ def generate_diagram_from_description(description: str, name: str = "Nouveau Dia
         print(f"Erreur : {str(e)}")
         raise ValueError(f"Échec de la génération du diagramme : {str(e)}")
 
-def execute_process_from_diagram(data: Dict, folder: str, llm: str = "openai") -> Dict:
+async def execute_process_from_diagram(data: Dict, folder: str, llm: str = "openai") -> Dict:
     """
-    Exécute un processus basé sur un diagramme de tâches et d'agents.
+    Exécute un processus basé sur un diagramme de tâches et d'agents de manière asynchrone.
     
     Args:
         data (Dict): Données JSON décrivant les nœuds et les liens du diagramme
@@ -313,7 +323,7 @@ def execute_process_from_diagram(data: Dict, folder: str, llm: str = "openai") -
                 src = os.path.join(folder, file)
                 if os.path.exists(src):
                     agents_dict[node['key']].tools = [choose_tool(src=src)]
-                    backstory = crewai_summarize_if_not_exists(pdf=src, llm=llm)
+                    backstory = await crewai_summarize_if_not_exists(pdf=src, llm=llm)
                     agents_dict[node['key']].backstory += f"\n\nContexte du fichier {file} :\n{backstory}"
                 else:
                     print(f"Le fichier {file} n'existe pas.")
@@ -360,7 +370,7 @@ def execute_process_from_diagram(data: Dict, folder: str, llm: str = "openai") -
                     print(f"{MAGENTA}KICKOFF FOR TASK DESCRIPTION{END} : \n{RED}{task.description}{END}")
                     print(f"{MAGENTA}EXPECTED OUTPUT{END} : \n{RED}{task.expected_output}{END}")
                     
-                    kickoff = crew.kickoff()
+                    kickoff = await crew.kickoff_async()
                     result = (
                         f"\n\n***\n\n"
                         f"\n\n## {task.output.agent}\n\n"

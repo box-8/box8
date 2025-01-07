@@ -260,7 +260,7 @@ function Flow() {
     setEdges((eds) => eds.filter((edge) => edge.id !== taskId));
   };
 
-  const handleLoadDiagram = (diagramData, fileName) => {
+  const handleLoadDiagram = useCallback((diagramData, fileName) => {
     console.log('Diagram Data:', diagramData);
     console.log('File Name:', fileName);
     
@@ -331,12 +331,12 @@ function Flow() {
 
       // Calculer les positions en fonction des niveaux
       const nodeSpacing = {
-        x: 350, // Augmentation de l'espacement horizontal
-        y: 300  // Augmentation de l'espacement vertical
+        x: 350,
+        y: 300
       };
 
-      const startX = 150; // Augmentation de la marge gauche
-      const startY = 150; // Augmentation de la marge supérieure
+      const startX = 150;
+      const startY = 150;
 
       // Créer les nœuds avec leurs positions calculées
       const newNodes = diagramData.nodes.map(node => {
@@ -401,7 +401,7 @@ function Flow() {
           data: {
             label: edge.description,
             description: edge.description,
-            expected_output: edge.expected_output,
+            expectedOutput: edge.expected_output,
             relationship: edge.relationship
           }
         };
@@ -416,7 +416,7 @@ function Flow() {
     } else {
       console.error('Invalid diagram data structure:', diagramData);
     }
-  };
+  }, []); // No dependencies needed since we only use setState functions which are stable
 
   const handleCreateCrewAI = useCallback(() => {
     // Récupérer les données du diagramme
@@ -428,7 +428,9 @@ function Flow() {
       links: edges.map(edge => ({
         from: edge.source,
         to: edge.target,
-        ...edge.data
+        description: edge.data?.description,
+        expected_output: edge.data?.expectedOutput,
+        relationship: edge.data?.relationship
       }))
     };
     console.log(diagramData);
@@ -521,7 +523,7 @@ function Flow() {
         from: edge.source,
         to: edge.target,
         description: edge.data?.description,
-        expected_output: edge.data?.expectedOutput,
+        expectedOutput: edge.data?.expectedOutput,
         relationship: edge.data?.relationship
       }));
 
@@ -570,6 +572,40 @@ function Flow() {
       alert(error.message);
     }
   };
+
+  // Fonction pour rafraîchir le diagramme actuel
+  const handleRefreshDiagram = useCallback(() => {
+    if (!currentDiagramName) return;
+
+    fetch(`http://localhost:8000/designer/get-diagram/${currentDiagramName}`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    })
+      .then(response => response.json())
+      .then(data => {
+        // Nettoyage des liaisons invalides
+        if (data.nodes && data.links) {
+          // Créer un ensemble des clés de nœuds valides
+          const validNodeKeys = new Set(data.nodes.map(node => node.key));
+          
+          // Filtrer les liaisons pour ne garder que celles avec des nœuds valides
+          data.links = data.links.filter(link => 
+            validNodeKeys.has(link.from) && validNodeKeys.has(link.to)
+          );
+        }
+
+        handleLoadDiagram(data, currentDiagramName);
+        // Ajout du fitView après un court délai pour laisser le temps au diagramme de se charger
+        setTimeout(() => {
+          fitView({ padding: 0.2 });
+        }, 100);
+      })
+      .catch(error => console.error('Error refreshing diagram:', error));
+  }, [currentDiagramName, handleLoadDiagram, fitView]);
 
   // Gestionnaire de sélection des nœuds
   const onNodeClick = useCallback((event, node) => {
@@ -728,7 +764,9 @@ function Flow() {
         onLoginClick={() => setShowLoginModal(true)}
         onProfileClick={() => setShowProfileModal(true)}
         user={user}
-        hasDiagram={currentDiagramName !== ''}
+        hasDiagram={nodes.length > 0}
+        onRefreshDiagram={handleRefreshDiagram}
+        currentDiagramName={currentDiagramName}
       />
 
       <AgentModal
@@ -761,7 +799,11 @@ function Flow() {
         handleClose={() => setShowDiagramModal(false)}
         onSave={handleSaveDiagram}
         onDelete={handleDeleteDiagram}
-        initialData={{ name: currentDiagramName, description: currentDiagramDescription }}
+        onRefresh={handleRefreshDiagram}
+        initialData={{
+          name: currentDiagramName,
+          description: currentDiagramDescription
+        }}
       />
 
       <DiagramModalNew
@@ -775,12 +817,15 @@ function Flow() {
         show={showResponseModal}
         handleClose={() => setShowResponseModal(false)}
         message={responseMessage}
+        diagramName={currentDiagramName}
       />
 
       <JsonFilesModal
         show={showJsonFilesModal}
         handleClose={() => setShowJsonFilesModal(false)}
         onFileSelect={handleLoadDiagram}
+        onNewDiagram={() => setShowNewDiagramModal(true)}
+        reactFlowInstance={{ fitView }}
       />
 
       <LoginModal

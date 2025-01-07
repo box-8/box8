@@ -1,12 +1,18 @@
-from fastapi import FastAPI, Request, HTTPException, UploadFile, File
+from fastapi import FastAPI, Request, HTTPException, UploadFile, File, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from app.auth.auth import router as auth_router, get_user_from_token
+from app.auth.auth import (
+    router as auth_router,
+    get_user_from_token,
+    create_access_token,
+    ACCESS_TOKEN_EXPIRE_MINUTES
+)
 import json
 import os
 from pydantic import BaseModel
 from typing import List
 from app.services.diagram_service import execute_process_from_diagram, generate_diagram_from_description
+import aiofiles
 
 # Initialisation de l'application avec configuration des slashes
 app = FastAPI(
@@ -30,6 +36,37 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"]
 )
+
+@app.middleware("http")
+async def extend_session_middleware(request: Request, call_next):
+    response = await call_next(request)
+    
+    # Récupérer le cookie de session
+    session = request.cookies.get("session")
+    if session:
+        # Créer un nouveau token avec une durée prolongée
+        try:
+            user = get_user_from_token(session)
+            if user:
+                access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+                access_token = create_access_token(
+                    data={"sub": user.email}, expires_delta=access_token_expires
+                )
+                
+                # Mettre à jour le cookie de session
+                response.set_cookie(
+                    key="session",
+                    value=access_token,
+                    httponly=True,
+                    secure=False,  # Mettre à True en production avec HTTPS
+                    samesite="lax",
+                    max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60
+                )
+        except:
+            # En cas d'erreur, ne pas bloquer la réponse
+            pass
+    
+    return response
 
 # Inclusion des routes d'authentification
 app.include_router(auth_router)
@@ -85,8 +122,8 @@ async def designer_get_diagram(filename: str):
         if not os.path.exists(file_path):
             raise HTTPException(status_code=404, detail="File not found")
             
-        with open(file_path, 'r', encoding='utf-8') as file:
-            content = json.load(file)
+        async with aiofiles.open(file_path, 'r', encoding='utf-8') as file:
+            content = json.loads(await file.read())
         return JSONResponse(content)
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON file")
@@ -105,26 +142,20 @@ async def save_diagram(request: Request, data: DiagramSave):
         raise HTTPException(status_code=401, detail="Session invalide")
     
     try:
-        # Vérifier que le diagramme est un JSON valide
-        diagram_data = json.loads(data.diagram)
+        if not data.name.endswith('.json'):
+            data.name += '.json'
         
-        # Créer le dossier diagrams s'il n'existe pas
-        # diagrams_dir = os.path.join("sharepoint", "designer")
-        diagrams_dir = get_absolute_path('sharepoint/designer')
-        os.makedirs(diagrams_dir, exist_ok=True)
+        file_path = get_absolute_path(f'sharepoint/designer/{data.name}')
         
-        # Sauvegarder le diagramme
-        filename = f"{data.name.replace(' ', '_')}.json"
-        filepath = os.path.join(diagrams_dir, filename)
+        # Vérifier si le dossier existe, sinon le créer
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
         
-        with open(filepath, 'w') as f:
-            json.dump(diagram_data, f, indent=2)
+        async with aiofiles.open(file_path, 'w', encoding='utf-8') as file:
+            await file.write(data.diagram)
         
-        return {"message": "Diagramme sauvegardé avec succès", "filename": filename}
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Le diagramme n'est pas un JSON valide")
+        return {"status": "success", "message": f"Diagramme {data.name} sauvegardé avec succès"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur lors de la sauvegarde: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/designer/delete-diagram/{filename}")
 async def designer_delete_diagram(filename: str):
@@ -161,7 +192,7 @@ async def designer_launch_crewai(request: Request):
         if not os.path.exists(user_folder):
             os.makedirs(user_folder)
             
-        result = execute_process_from_diagram(data, user_folder, llm)
+        result = await execute_process_from_diagram(data, user_folder, llm)
         return JSONResponse(result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -178,7 +209,7 @@ async def generate_diagram(request: Request, data: DiagramDescription):
         raise HTTPException(status_code=401, detail="Session invalide")
     
     try:
-        diagram_data = generate_diagram_from_description(data.description, data.name)
+        diagram_data = await generate_diagram_from_description(data.description, data.name)
         return JSONResponse(content=diagram_data)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -228,10 +259,15 @@ async def upload_user_file(request: Request, file: UploadFile = File(...)):
     user_folder = get_user_folder(user.email)
     try:
         file_path = os.path.join(user_folder, file.filename)
-        with open(file_path, "wb") as buffer:
-            content = await file.read()
-            buffer.write(content)
-        return {"success": True, "filename": file.filename}
+        
+        # Lecture du contenu du fichier uploadé
+        content = await file.read()
+        
+        # Écriture asynchrone du fichier
+        async with aiofiles.open(file_path, 'wb') as f:
+            await f.write(content)
+        
+        return {"message": f"Fichier {file.filename} uploadé avec succès"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -266,4 +302,5 @@ async def root():
 # Point d'entrée pour lancer l'application
 if __name__ == "__main__":
     import uvicorn
+    from datetime import timedelta
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

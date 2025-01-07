@@ -1,12 +1,14 @@
 import os
 import shutil
 import PyPDF2
+import aiofiles
+from io import BytesIO
 from PyPDF2 import PdfWriter
 from docx import Document
 
-def extract_page_text_from_file(src: str) -> list:
+async def extract_page_text_from_file(src: str) -> list:
     """
-    Extrait le texte d'un fichier PDF ou DOCX page par page.
+    Extrait le texte d'un fichier PDF ou DOCX page par page de manière asynchrone.
     
     Args:
         src (str): Chemin vers le fichier source
@@ -19,8 +21,11 @@ def extract_page_text_from_file(src: str) -> list:
         extension = os.path.splitext(src)[1].lower()
 
         if extension == '.pdf':
-            with open(src, 'rb') as pdf_file:
-                reader = PyPDF2.PdfReader(pdf_file)
+            async with aiofiles.open(src, 'rb') as pdf_file:
+                file_content = await pdf_file.read()
+                # Créer un objet BytesIO à partir des bytes lus
+                pdf_bytes = BytesIO(file_content)
+                reader = PyPDF2.PdfReader(pdf_bytes)
 
                 for page_num, page in enumerate(reader.pages):
                     try:
@@ -49,14 +54,11 @@ def extract_page_text_from_file(src: str) -> list:
                     texte_pages.append("\n".join(bloc))
 
             except Exception as e:
-                print(f"Erreur lors de l'extraction du texte du fichier DOCX : {e}")
+                print(f"Erreur lors de la lecture du fichier DOCX : {e}")
+                raise
 
-        else:
-            print("Format de fichier non pris en charge. Seuls les fichiers PDF et DOCX sont acceptés.")
-
-    except FileNotFoundError:
-        print(f"Le fichier {src} est introuvable.")
     except Exception as e:
-        print(f"Une erreur s'est produite : {e}")
-    
+        print(f"Erreur lors de la lecture du fichier : {e}")
+        raise
+
     return texte_pages
