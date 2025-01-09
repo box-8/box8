@@ -11,7 +11,6 @@ const AgentModal = ({ show, onHide, onAdd, onUpdate, onDelete, onSave, selectedN
   });
   const [sharePointFiles, setSharePointFiles] = useState({ files: [] });
   const [selectedFile, setSelectedFile] = useState('');
-  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (show) {
@@ -29,7 +28,6 @@ const AgentModal = ({ show, onHide, onAdd, onUpdate, onDelete, onSave, selectedN
         })
         .catch(error => {
           console.error('Erreur lors du chargement des fichiers:', error);
-          setError('Erreur lors du chargement des fichiers');
         });
     }
   }, [show]);

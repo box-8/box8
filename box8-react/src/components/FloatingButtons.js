@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { Button, Form } from 'react-bootstrap';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 
-const FloatingButtons = ({ 
-  onAddAgent, 
-  onAddTask, 
-  onCreateCrewAI, 
-  onSaveDiagram, 
+const FloatingButtons = ({
+  onAddAgent,
+  onAddTask,
+  onCreateCrewAI,
+  onSaveDiagram,
   onLoadDiagram,
   onNewDiagram,
   onRefreshDiagram,
@@ -52,7 +52,7 @@ const FloatingButtons = ({
             onClick={onSaveDiagram}
             title="Save Diagram"
           >
-            <i className="bi bi-save"></i>
+            <i className="bi bi-diagram-3"></i>
           </Button>
 
           <Button
@@ -91,22 +91,27 @@ const FloatingButtons = ({
           >
             <i className="bi bi-list-task"></i>
           </Button>
-
+          <Button
+            variant="warning"
+            className="floating-button"
+            onClick={handleCreateCrewAI}
+            title="Create CrewAI"
+          >
+            <i className="bi bi-play-circle"></i>
+          </Button>
           <div className="chat-input-container" style={{ position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '10px', backgroundColor: 'white', padding: '10px', borderRadius: '8px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
             <Form.Control
               type="text"
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               placeholder="Enter your message..."
-              style={{ width: '300px' }}
+              style={{ width: '500px' }}
             />
             <Button
-              variant="warning"
+              variant="primary"
               onClick={handleCreateCrewAI}
               title="Create CrewAI"
-            >
-              <i className="bi bi-play-circle"></i>
-            </Button>
+            ><i className="bi bi-play"></i></Button>
           </div>
         </>
       )}

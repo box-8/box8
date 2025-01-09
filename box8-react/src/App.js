@@ -336,7 +336,6 @@ function Flow() {
         y: 300
       };
 
-      const startX = 150;
       const startY = 150;
 
       // Créer les nœuds avec leurs positions calculées
