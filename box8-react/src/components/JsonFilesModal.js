@@ -141,7 +141,9 @@ const JsonFilesModal = ({
               style={{ 
                 flexGrow: 1,
                 overflowY: 'auto',
-                maxHeight: '100%',
+                maxHeight: 'calc(90vh - 300px)',
+                border: '1px solid rgba(0,0,0,.125)',
+                borderRadius: '0.375rem',
                 marginBottom: '10px'
               }}
             >
@@ -157,6 +159,11 @@ const JsonFilesModal = ({
                   {file}
                 </ListGroup.Item>
               ))}
+              {files.length === 0 && (
+                <ListGroup.Item className="text-center text-muted">
+                  Aucun diagramme disponible
+                </ListGroup.Item>
+              )}
             </ListGroup>
           </div>
           <div className="col-md-6" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -164,9 +171,11 @@ const JsonFilesModal = ({
             <div style={{ 
               flexGrow: 1,
               overflowY: 'auto',
+              maxHeight: 'calc(90vh - 280px)',
               backgroundColor: '#f8f9fa',
               padding: '10px',
               borderRadius: '4px',
+              border: '1px solid rgba(0,0,0,.125)',
               marginBottom: '10px'
             }}>
               {fileContent && (

@@ -11,8 +11,11 @@ import json
 import os
 from pydantic import BaseModel
 from typing import List
-from app.services.diagram_service import execute_process_from_diagram, generate_diagram_from_description
+from app.services.diagram_service import (execute_process_from_diagram, 
+                                        generate_diagram_from_description,
+                                        ask_process_from_diagram)
 import aiofiles
+from datetime import timedelta
 
 # Initialisation de l'application avec configuration des slashes
 app = FastAPI(
@@ -83,6 +86,9 @@ class DiagramDescription(BaseModel):
 class DiagramSave(BaseModel):
     name: str
     diagram: str
+
+class LLMSelection(BaseModel):
+    llm: str
 
 def get_absolute_path(relative_path: str) -> str:
     """Fonction utilitaire pour obtenir le chemin absolu d'un fichier"""
@@ -187,12 +193,20 @@ async def designer_launch_crewai(request: Request):
     try:
         data = await request.json()
         user_folder = get_user_folder(user.email)
-        llm = data.get('llm', 'openai')
+        llm = request.cookies.get("selected_llm", 'openai')
+        chat_input = data.get('chatInput', '')
+        
+        print(f"Chat input reçu: {chat_input}")  # Afficher la valeur du chat
         
         if not os.path.exists(user_folder):
             os.makedirs(user_folder)
             
         result = await execute_process_from_diagram(data, user_folder, llm)
+        if not chat_input=='': 
+            chat = await ask_process_from_diagram(chat_input, result["message"], llm)
+            print(f"Chat renvoyé: {chat}")
+            result["message"] += chat
+
         return JSONResponse(result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -294,6 +308,20 @@ async def delete_user_file(request: Request, filename: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/set-llm")
+async def set_llm(request: Request, llm_data: LLMSelection):
+    session = request.cookies.get("session")
+    if not session:
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    
+    user = get_user_from_token(session)
+    if not user:
+        raise HTTPException(status_code=401, detail="Session invalide")
+    
+    response = JSONResponse(content={"message": "LLM sélectionné avec succès"})
+    response.set_cookie(key="selected_llm", value=llm_data.llm)
+    return response
+
 # Route de test
 @app.get("/")
 async def root():
@@ -302,5 +330,4 @@ async def root():
 # Point d'entrée pour lancer l'application
 if __name__ == "__main__":
     import uvicorn
-    from datetime import timedelta
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

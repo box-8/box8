@@ -1,5 +1,5 @@
-import React from 'react';
-import { Button } from 'react-bootstrap';
+import React, { useState } from 'react';
+import { Button, Form } from 'react-bootstrap';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 
 const FloatingButtons = ({ 
@@ -10,9 +10,18 @@ const FloatingButtons = ({
   onLoadDiagram,
   onNewDiagram,
   onRefreshDiagram,
+  onShowResponse,
   hasDiagram,
-  currentDiagramName
+  currentDiagramName,
+  hasResponse
 }) => {
+  const [chatInput, setChatInput] = useState('');
+
+  const handleCreateCrewAI = () => {
+    onCreateCrewAI(chatInput);
+    setChatInput('');
+  };
+
   return (
     <div className="floating-buttons">
       <Button
@@ -43,7 +52,26 @@ const FloatingButtons = ({
             onClick={onSaveDiagram}
             title="Save Diagram"
           >
-            <i className="bi bi-diagram-3"></i>
+            <i className="bi bi-save"></i>
+          </Button>
+
+          <Button
+            variant="warning"
+            className="floating-button"
+            onClick={onRefreshDiagram}
+            title="Refresh Diagram"
+          >
+            <i className="bi bi-arrow-clockwise"></i>
+          </Button>
+
+          <Button
+            variant="success"
+            className="floating-button"
+            onClick={onShowResponse}
+            title="Show Response"
+            disabled={!hasResponse}
+          >
+            <i className="bi bi-chat-text"></i>
           </Button>
 
           <Button
@@ -64,14 +92,22 @@ const FloatingButtons = ({
             <i className="bi bi-list-task"></i>
           </Button>
 
-          <Button
-            variant="warning"
-            className="floating-button"
-            onClick={onCreateCrewAI}
-            title="Create CrewAI"
-          >
-            <i className="bi bi-play-circle"></i>
-          </Button>
+          <div className="chat-input-container" style={{ position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '10px', backgroundColor: 'white', padding: '10px', borderRadius: '8px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
+            <Form.Control
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              placeholder="Enter your message..."
+              style={{ width: '300px' }}
+            />
+            <Button
+              variant="warning"
+              onClick={handleCreateCrewAI}
+              title="Create CrewAI"
+            >
+              <i className="bi bi-play-circle"></i>
+            </Button>
+          </div>
         </>
       )}
     </div>

@@ -1,9 +1,9 @@
 import os
 import shutil
-import PyPDF2
+import pypdf
 import aiofiles
 from io import BytesIO
-from PyPDF2 import PdfWriter
+from pypdf import PdfWriter
 from docx import Document
 
 async def extract_page_text_from_file(src: str) -> list:
@@ -25,7 +25,7 @@ async def extract_page_text_from_file(src: str) -> list:
                 file_content = await pdf_file.read()
                 # Créer un objet BytesIO à partir des bytes lus
                 pdf_bytes = BytesIO(file_content)
-                reader = PyPDF2.PdfReader(pdf_bytes)
+                reader = pypdf.PdfReader(pdf_bytes)
 
                 for page_num, page in enumerate(reader.pages):
                     try:

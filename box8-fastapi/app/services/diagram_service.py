@@ -367,6 +367,7 @@ async def execute_process_from_diagram(data: Dict, folder: str, llm: str = "open
 
                 try:
                     crew = Crew(agents=[from_agent], tasks=[task])
+                    print(f"{MAGENTA}AGENT{END} : \n{RED}{from_agent.role}{END}")
                     print(f"{MAGENTA}KICKOFF FOR TASK DESCRIPTION{END} : \n{RED}{task.description}{END}")
                     print(f"{MAGENTA}EXPECTED OUTPUT{END} : \n{RED}{task.expected_output}{END}")
                     
@@ -399,3 +400,93 @@ async def execute_process_from_diagram(data: Dict, folder: str, llm: str = "open
             'status': 'error',
             'message': str(e)
         }
+
+
+
+async def ask_process_from_diagram(question: str, diagram_result: str, llm: str = "openai") -> str:
+    """
+    Crée un crew pour poser une question au résultat du diagramme.
+    
+    Args:
+        question (str): La question posée par l'utilisateur
+        diagram_result (str): Le résultat du diagramme à analyser
+        llm (str): Le modèle de langage à utiliser
+        
+    Returns:
+        str: La réponse à la question
+    """
+    try:
+        # Création de l'agent d'analyse
+        try:
+            analyst = Agent(
+                role='Analyst',
+                goal='Analyser le résultat du diagramme et répondre à la question',
+                backstory="""Tu es un expert en analyse de données. Tu sais interpréter des informations 
+                complexes et fournir des réponses claires et précises.""",
+                llm=choose_llm(llm),
+                verbose=True
+            )
+            # print(f"{GREEN}Agent créé avec succès{END}")
+        except Exception as e:
+            print(f"{RED}Erreur lors de la création de l'agent: {str(e)}{END}")
+            if hasattr(e, 'response'):
+                print(f"{RED}Détails de l'erreur HTTP:{END}")
+                print(f"{RED}Status: {e.response.status_code}{END}")
+                print(f"{RED}Message: {e.response.text}{END}")
+            raise
+
+        # Tâche d'analyse
+        try:
+            analysis_task = Task(
+                description=f"""Analyse le texte suivant et réponds à la question de l'utilisateur.
+                
+                résultat du diagramme: {diagram_result}
+                
+                Question: {question}
+                
+                Instructions:
+                1. Lis attentivement le résultat du diagramme
+                2. Identifie les informations pertinentes pour répondre à la question
+                3. Fournis la réponse détaillée et claire
+                4. Assure-toi que ta réponse est précise, basée sur les résultats du diagramme et tes propres connaissances sur le sujet
+                """,
+                expected_output="""La réponse à la demande de l'utilisateur,
+                L'analyse doit inclure des explications claires.""",
+                agent=analyst
+            )
+            #print(f"{GREEN}Tâche créée avec succès{END}")
+        except Exception as e:
+            print(f"{RED}Erreur lors de la création de la tâche: {str(e)}{END}")
+            raise
+
+        # Création du crew
+        try:
+            crew = Crew(
+                agents=[analyst],
+                tasks=[analysis_task]
+            )
+            #print(f"{GREEN}Crew créé avec succès{END}")
+        except Exception as e:
+            print(f"{RED}Erreur lors de la création du crew: {str(e)}{END}")
+            raise
+
+        try:
+            # Exécution du processus de manière asynchrone
+            kickoff = await crew.kickoff_async()
+            
+            result = (
+                        f"\n\n***\n\n"
+                        f"\n\n## {analysis_task.output.agent}\n\n"
+                        f"\n\n### {analysis_task.output.description}\n\n"
+                        f"\n\n{analysis_task.output.raw}\n\n"
+                    )
+           # print(f"RESULT : \n\n{MAGENTA}{result}{END}")
+            return analysis_task.output.raw
+        except Exception as e:
+            error_msg = f"Error creating CrewAI Kickoff: {str(e)}"
+            print(f"{RED}{error_msg}{END}")
+            raise
+    except Exception as e:
+        error_msg = f"Error creating CrewAI Process: {str(e)}"
+        print(f"{RED}{error_msg}{END}")
+        return error_msg

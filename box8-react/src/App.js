@@ -76,6 +76,7 @@ function Flow() {
   const [currentDiagramName, setCurrentDiagramName] = useState('');
   const [currentDiagramDescription, setCurrentDiagramDescription] = useState('');
   const [isNewDiagram, setIsNewDiagram] = useState(false);
+  const [chatInput, setChatInput] = useState(''); // Ajouter l'état pour le chatInput
   const { fitView, getNodes, getEdges } = useReactFlow();
 
   // État pour suivre si le diagramme a été chargé initialement
@@ -231,7 +232,7 @@ function Flow() {
             ...edge,
             data: {
               description: taskData.description,
-              expectedOutput: taskData.expectedOutput,
+              expected_output: taskData.expectedOutput,
               type: taskData.type
             }
           };
@@ -249,7 +250,7 @@ function Flow() {
       type: 'custom',
       data: {
         description: taskData.description,
-        expectedOutput: taskData.expectedOutput,
+        expected_output: taskData.expectedOutput,
         type: taskData.type
       }
     };
@@ -401,7 +402,7 @@ function Flow() {
           data: {
             label: edge.description,
             description: edge.description,
-            expectedOutput: edge.expected_output,
+            expected_output: edge.expected_output,
             relationship: edge.relationship
           }
         };
@@ -418,7 +419,7 @@ function Flow() {
     }
   }, []); // No dependencies needed since we only use setState functions which are stable
 
-  const handleCreateCrewAI = useCallback(() => {
+  const handleCreateCrewAI = useCallback((chatInput) => {
     // Récupérer les données du diagramme
     const diagramData = {
       nodes: nodes.map(node => ({
@@ -429,14 +430,14 @@ function Flow() {
         from: edge.source,
         to: edge.target,
         description: edge.data?.description,
-        expected_output: edge.data?.expectedOutput,
+        expected_output: edge.data?.expected_output,
         relationship: edge.data?.relationship
-      }))
+      })),
+      chatInput: chatInput // Ajouter le chatInput aux données envoyées
     };
-    console.log(diagramData);
+    
     var csrf = Cookies.get('csrftoken');
 
-    // return false
     // Envoyer la requête au serveur
     fetch('http://localhost:8000/designer/launch-crewai/', {
       method: 'POST',
@@ -523,7 +524,7 @@ function Flow() {
         from: edge.source,
         to: edge.target,
         description: edge.data?.description,
-        expectedOutput: edge.data?.expectedOutput,
+        expected_output: edge.data?.expected_output,
         relationship: edge.data?.relationship
       }));
 
@@ -752,21 +753,15 @@ function Flow() {
       <FloatingButtons 
         onAddAgent={() => setShowAgentModal(true)}
         onAddTask={() => setShowTaskModal(true)}
+        onCreateCrewAI={handleCreateCrewAI}
         onSaveDiagram={() => setShowDiagramModal(true)}
         onLoadDiagram={() => setShowJsonFilesModal(true)}
-        onCreateCrewAI={handleCreateCrewAI}
         onNewDiagram={handleNewDiagram}
-        onNewDiagramClick={() => setShowNewDiagramModal(true)}
-        onOpenDiagramClick={() => setShowJsonFilesModal(true)}
-        onSaveDiagramClick={() => setShowDiagramModal(true)}
-        onShowResponseClick={() => setShowResponseModal(true)}
-        isAuthenticated={isAuthenticated}
-        onLoginClick={() => setShowLoginModal(true)}
-        onProfileClick={() => setShowProfileModal(true)}
-        user={user}
-        hasDiagram={nodes.length > 0}
         onRefreshDiagram={handleRefreshDiagram}
+        onShowResponse={() => setShowResponseModal(true)}
+        hasDiagram={nodes.length > 0}
         currentDiagramName={currentDiagramName}
+        hasResponse={!!responseMessage}
       />
 
       <AgentModal

@@ -30,8 +30,8 @@ const CustomEdge = ({
         {data?.description && (
           <><strong>Task:</strong> {data.description}<br/></>
         )}
-        {data?.expectedOutput && (
-          <><strong>Expected Output:</strong> {data.expectedOutput}<br/></>
+        {data?.expected_output && (
+          <><strong>Expected Output:</strong> {data.expected_output}<br/></>
         )}
         {data?.type && (
           <><strong>Relationship:</strong> {data.type}<br/></>
