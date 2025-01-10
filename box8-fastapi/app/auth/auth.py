@@ -121,9 +121,45 @@ def get_user_from_token(token: str) -> Optional[User]:
     except JWTError:
         return None
 
+def renew_token(response: Response, current_token: str):
+    """Renouvelle le token JWT si nécessaire"""
+    try:
+        # Décoder le token actuel sans vérifier l'expiration
+        payload = jwt.decode(current_token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_exp": False})
+        
+        # Calculer le temps restant avant expiration
+        exp = datetime.fromtimestamp(payload['exp'], tz=timezone.utc)
+        now = datetime.now(timezone.utc)
+        time_remaining = exp - now
+        
+        # Renouveler si moins de 15 minutes restantes
+        if time_remaining < timedelta(minutes=15):
+            # Créer un nouveau token
+            new_token = create_access_token(
+                data={"sub": payload["sub"]},
+                expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+            )
+            
+            # Mettre à jour le cookie
+            response.set_cookie(
+                key="session",
+                value=new_token,
+                httponly=True,
+                secure=False,  # Set to True if using HTTPS
+                samesite="lax",
+                max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+                path="/"
+            )
+            return new_token
+            
+    except JWTError:
+        return None
+    
+    return current_token
+
 # Routes d'authentification
 @router.get("/auth/check-auth/")
-async def check_auth(session: Optional[str] = Cookie(None)):
+async def check_auth(response: Response, session: Optional[str] = Cookie(None)):
     """Vérifie si l'utilisateur est authentifié via le cookie de session"""
     if not session:
         return {"authenticated": False}
@@ -131,6 +167,9 @@ async def check_auth(session: Optional[str] = Cookie(None)):
     user = get_user_from_token(session)
     if not user:
         return {"authenticated": False}
+    
+    # Renouveler le token si nécessaire
+    renewed_token = renew_token(response, session)
     
     return {
         "authenticated": True,
@@ -196,7 +235,7 @@ async def logout(response: Response, session: Optional[str] = Cookie(None)):
     return {"authenticated": False}
 
 @router.get("/auth/me/")
-async def read_users_me(session: Optional[str] = Cookie(None)):
+async def read_users_me(response: Response, session: Optional[str] = Cookie(None)):
     """Récupère les informations de l'utilisateur connecté"""
     if not session:
         raise HTTPException(
@@ -211,4 +250,12 @@ async def read_users_me(session: Optional[str] = Cookie(None)):
             detail="Session invalide"
         )
     
-    return user
+    # Renouveler le token si nécessaire
+    renewed_token = renew_token(response, session)
+    
+    return {
+        "id": user.id,
+        "email": user.email,
+        "username": user.username,
+        "is_active": user.is_active
+    }

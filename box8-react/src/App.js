@@ -666,6 +666,93 @@ function Flow() {
     }
   }, [nodes, fitView]);
 
+  // Vérification périodique de la session
+  useEffect(() => {
+    let sessionCheckTimeout;
+    
+    const checkSession = async () => {
+      if (isAuthenticated) {
+        try {
+          const response = await fetch('http://localhost:8000/auth/check-auth/', {
+            credentials: 'include',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          if (!response.ok) {
+            console.log('Session invalide, déconnexion automatique');
+            await handleLogout();
+            return;
+          }
+          
+          const data = await response.json();
+          if (!data.authenticated) {
+            console.log('Session expirée, déconnexion automatique');
+            await handleLogout();
+          } else {
+            // Programmer la prochaine vérification
+            sessionCheckTimeout = setTimeout(checkSession, 5 * 60 * 1000); // Vérifier toutes les 5 minutes
+          }
+        } catch (error) {
+          console.error('Erreur lors de la vérification de la session:', error);
+          // En cas d'erreur réseau, on ne déconnecte pas l'utilisateur
+          sessionCheckTimeout = setTimeout(checkSession, 60 * 1000); // Réessayer dans 1 minute en cas d'erreur
+        }
+      }
+    };
+
+    // Démarrer la vérification
+    if (isAuthenticated) {
+      sessionCheckTimeout = setTimeout(checkSession, 5 * 60 * 1000); // Première vérification après 5 minutes
+    }
+
+    return () => {
+      if (sessionCheckTimeout) {
+        clearTimeout(sessionCheckTimeout);
+      }
+    };
+  }, [isAuthenticated]);
+
+  // Intercepteur global pour les réponses 401
+  useEffect(() => {
+    const interceptor = async (response) => {
+      if (response.status === 401) {
+        // Vérifier si la session est réellement expirée
+        try {
+          const authCheck = await fetch('http://localhost:8000/auth/check-auth/', {
+            credentials: 'include',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          if (!authCheck.ok || !(await authCheck.json()).authenticated) {
+            console.log('Session expirée confirmée, déconnexion automatique');
+            await handleLogout();
+            return null;
+          }
+        } catch (error) {
+          console.error('Erreur lors de la vérification de session:', error);
+          return response; // En cas d'erreur, on laisse passer la réponse originale
+        }
+      }
+      return response;
+    };
+
+    const originalFetch = window.fetch;
+    window.fetch = async (...args) => {
+      const response = await originalFetch(...args);
+      return interceptor(response);
+    };
+
+    return () => {
+      window.fetch = originalFetch;
+    };
+  }, []);
+
   return (
     <div style={{ width: '100vw', height: '100vh', background: '#ffffff' }}>
       {!isAuthLoading && (
