@@ -6,7 +6,13 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from uuid import uuid4
 
-from app.models.user import User, UserLogin, UserInDB
+from app.models.user import User, UserLogin, UserInDB, UserRegistration
+from app.database.database import (
+    get_user_by_email,
+    create_user,
+    check_user_exists,
+    init_db
+)
 
 # Configuration de la sécurité
 SECRET_KEY = "votre_clé_secrète_très_longue_et_complexe"
@@ -20,25 +26,10 @@ invalidated_tokens = set()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Configuration du router
-router = APIRouter()
-
-# Base de données simulée (à remplacer par une vraie BD)
-users_db = {
-    "gael.jaunin@gmail.com": {
-        "id": str(uuid4()),
-        "username": "gaeljaunin",
-        "email": "gael.jaunin@gmail.com",
-        "hashed_password": pwd_context.hash("1234azerty"),
-        "is_active": True
-    },
-    "test@gmail.com": {
-        "id": str(uuid4()),
-        "username": "testuser",
-        "email": "test@gmail.com",
-        "hashed_password": pwd_context.hash("password123"),
-        "is_active": True
-    }
-}
+router = APIRouter(
+    prefix="/auth",
+    tags=["authentication"]
+)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Vérifie si le mot de passe correspond au hash"""
@@ -50,37 +41,28 @@ def get_password_hash(password: str) -> str:
 
 def get_user(email: str) -> Optional[UserInDB]:
     """Récupère un utilisateur par son email"""
-    if email in users_db:
-        user_dict = users_db[email]
+    user_dict = get_user_by_email(email)
+    if user_dict:
         return UserInDB(**user_dict)
     return None
 
-def authenticate_user(email: str, password: str) -> Optional[User]:
+def authenticate_user(email: str, password: str) -> Optional[UserInDB]:
     """Authentifie un utilisateur"""
     user = get_user(email)
     if not user:
         return None
     if not verify_password(password, user.hashed_password):
         return None
-    return User(
-        id=user.id,
-        email=user.email,
-        username=user.username,
-        is_active=user.is_active
-    )
+    return user
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Crée un token JWT"""
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    
-    to_encode.update({
-        "exp": expire.timestamp(),
-        "iat": datetime.now(timezone.utc).timestamp()
-    })
+        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
@@ -91,97 +73,61 @@ def get_user_from_token(token: str) -> Optional[User]:
         if token in invalidated_tokens:
             return None
 
-        # Add verification options to check expiration
+        # Décoder et vérifier le token
         payload = jwt.decode(
-            token, 
-            SECRET_KEY, 
+            token,
+            SECRET_KEY,
             algorithms=[ALGORITHM],
-            options={"verify_exp": True}  # Enforce expiration check
+            options={"verify_exp": True}
         )
-        
-        # Check if token is expired
-        exp = payload.get("exp")
-        if exp is None or datetime.fromtimestamp(exp, timezone.utc) < datetime.now(timezone.utc):
-            return None
-            
+
         email: str = payload.get("sub")
         if email is None:
             return None
-            
-        user_db = get_user(email)
-        if user_db is None:
+
+        user = get_user(email)
+        if user is None:
             return None
-            
+
         return User(
-            id=user_db.id,
-            email=user_db.email,
-            username=user_db.username,
-            is_active=user_db.is_active
+            id=user.id,
+            email=user.email,
+            username=user.username,
+            is_active=user.is_active
         )
     except JWTError:
         return None
 
-def renew_token(response: Response, current_token: str):
-    """Renouvelle le token JWT si nécessaire"""
-    try:
-        # Décoder le token actuel sans vérifier l'expiration
-        payload = jwt.decode(current_token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_exp": False})
-        
-        # Calculer le temps restant avant expiration
-        exp = datetime.fromtimestamp(payload['exp'], tz=timezone.utc)
-        now = datetime.now(timezone.utc)
-        time_remaining = exp - now
-        
-        # Renouveler si moins de 15 minutes restantes
-        if time_remaining < timedelta(minutes=15):
-            # Créer un nouveau token
-            new_token = create_access_token(
-                data={"sub": payload["sub"]},
-                expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-            )
-            
-            # Mettre à jour le cookie
-            response.set_cookie(
-                key="session",
-                value=new_token,
-                httponly=True,
-                secure=False,  # Set to True if using HTTPS
-                samesite="lax",
-                max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-                path="/"
-            )
-            return new_token
-            
-    except JWTError:
-        return None
+@router.post("/register", response_model=User)
+async def register(user_data: UserRegistration):
+    """Enregistre un nouvel utilisateur"""
+    # Vérifie si l'utilisateur existe déjà
+    exists, error_message = check_user_exists(user_data.email, user_data.username)
+    if exists:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_message
+        )
     
-    return current_token
-
-# Routes d'authentification
-@router.get("/auth/check-auth/")
-async def check_auth(response: Response, session: Optional[str] = Cookie(None)):
-    """Vérifie si l'utilisateur est authentifié via le cookie de session"""
-    if not session:
-        return {"authenticated": False}
-    
-    user = get_user_from_token(session)
-    if not user:
-        return {"authenticated": False}
-    
-    # Renouveler le token si nécessaire
-    renewed_token = renew_token(response, session)
-    
-    return {
-        "authenticated": True,
-        "user": {
-            "id": user.id,
-            "email": user.email,
-            "username": user.username,
-            "is_active": user.is_active
-        }
+    # Crée le nouvel utilisateur
+    new_user = {
+        "id": str(uuid4()),
+        "username": user_data.username,
+        "email": user_data.email,
+        "hashed_password": get_password_hash(user_data.password),
+        "is_active": True
     }
+    
+    try:
+        create_user(new_user)
+        return User(**new_user)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Impossible d'enregistrer l'utilisateur"
+        )
 
-@router.post("/auth/login/")
+@router.post("/login/")
 async def login(response: Response, user_data: UserLogin):
     """Endpoint de login qui retourne un token JWT et crée une session"""
     user = authenticate_user(user_data.email, user_data.password)
@@ -190,24 +136,23 @@ async def login(response: Response, user_data: UserLogin):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email ou mot de passe incorrect"
         )
-    
-    # Create token with expiration
+
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.email},
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expires_delta=access_token_expires
     )
-    
-    # Set session cookie with same expiration as token
+
+    # Configuration du cookie de session
     response.set_cookie(
         key="session",
         value=access_token,
         httponly=True,
-        secure=False,  # Set to True if using HTTPS
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         samesite="lax",
-        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # Convert minutes to seconds
-        path="/"
+        secure=False  # Mettre à True en production avec HTTPS
     )
-    
+
     return {
         "authenticated": True,
         "user": {
@@ -218,23 +163,40 @@ async def login(response: Response, user_data: UserLogin):
         }
     }
 
-@router.post("/auth/logout/")
+@router.post("/logout/")
 async def logout(response: Response, session: Optional[str] = Cookie(None)):
     """Endpoint de déconnexion qui supprime la session"""
     if session:
-        # Ajouter le token à la blacklist
         invalidated_tokens.add(session)
-        
+    
     response.delete_cookie(
         key="session",
-        path="/",  # Important: must match the path used when setting the cookie
-        secure=False,  # Set to True if using HTTPS
         httponly=True,
         samesite="lax"
     )
     return {"authenticated": False}
 
-@router.get("/auth/me/")
+@router.get("/check-auth/")
+async def check_auth(response: Response, session: Optional[str] = Cookie(None)):
+    """Vérifie si l'utilisateur est authentifié via le cookie de session"""
+    if not session:
+        return {"authenticated": False}
+
+    user = get_user_from_token(session)
+    if not user:
+        return {"authenticated": False}
+
+    return {
+        "authenticated": True,
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "username": user.username,
+            "is_active": user.is_active
+        }
+    }
+
+@router.get("/me/")
 async def read_users_me(response: Response, session: Optional[str] = Cookie(None)):
     """Récupère les informations de l'utilisateur connecté"""
     if not session:
@@ -242,20 +204,20 @@ async def read_users_me(response: Response, session: Optional[str] = Cookie(None
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Non authentifié"
         )
-    
+
     user = get_user_from_token(session)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Session invalide"
         )
-    
-    # Renouveler le token si nécessaire
-    renewed_token = renew_token(response, session)
-    
+
     return {
         "id": user.id,
         "email": user.email,
         "username": user.username,
         "is_active": user.is_active
     }
+
+# Initialisation de la base de données au démarrage
+init_db()

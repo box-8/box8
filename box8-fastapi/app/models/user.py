@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, validator
 from typing import Optional
 
 class UserBase(BaseModel):
@@ -21,3 +21,29 @@ class User(UserBase):
 
 class UserInDB(User):
     hashed_password: str
+
+class UserRegistration(BaseModel):
+    username: str
+    email: EmailStr
+    password: str
+    confirm_password: str
+
+    @validator('username')
+    def username_must_be_valid(cls, v):
+        if len(v) < 3:
+            raise ValueError('Le nom d\'utilisateur doit contenir au moins 3 caractères')
+        if not v.isalnum():
+            raise ValueError('Le nom d\'utilisateur doit contenir uniquement des caractères alphanumériques')
+        return v
+
+    @validator('confirm_password')
+    def passwords_match(cls, v, values):
+        if 'password' in values and v != values['password']:
+            raise ValueError('Les mots de passe ne correspondent pas')
+        return v
+
+    @validator('password')
+    def password_strength(cls, v):
+        if len(v) < 8:
+            raise ValueError('Le mot de passe doit contenir au moins 8 caractères')
+        return v
