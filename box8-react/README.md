@@ -2,69 +2,94 @@
 
 Interface utilisateur de Box8 développée avec React, permettant la création et la gestion visuelle de workflows basés sur des agents.
 
+*Dernière mise à jour : Janvier 2025*
+
 ## Architecture
 
 ```
 box8-react/
 ├── public/              # Ressources statiques
+│   ├── locales/        # Fichiers de traduction
+│   └── assets/         # Images et icônes
 ├── src/
 │   ├── components/     # Composants React
-│   │   ├── AgentNode.js       # Nœud d'agent dans le diagramme
-│   │   ├── OutputNode.js      # Nœud de sortie dans le diagramme
-│   │   ├── CustomEdge.js      # Connexion personnalisée entre les nœuds
-│   │   ├── AgentModal.js      # Modal de configuration d'agent
-│   │   ├── TaskModal.js       # Modal de configuration de tâche
-│   │   ├── DiagramModal.js    # Modal de gestion des diagrammes
-│   │   ├── DiagramModalNew.js # Modal de création de diagramme
-│   │   ├── ResponseModal.js   # Modal d'affichage des réponses
-│   │   ├── JsonFilesModal.js  # Modal de gestion des fichiers JSON
-│   │   ├── LoginModal.js      # Modal de connexion
-│   │   ├── UserProfileModal.js # Modal de profil utilisateur
-│   │   └── FloatingButtons.js # Boutons flottants d'actions
+│   │   ├── agents/           # Composants liés aux agents
+│   │   │   ├── AgentNode.js    # Nœud d'agent
+│   │   │   └── AgentModal.js   # Configuration d'agent
+│   │   ├── diagram/          # Composants du diagramme
+│   │   │   ├── CustomEdge.js   # Connexions personnalisées
+│   │   │   └── OutputNode.js   # Nœud de sortie
+│   │   ├── modals/           # Fenêtres modales
+│   │   │   ├── TaskModal.js    # Config. de tâche
+│   │   │   ├── DiagramModal.js # Gestion diagrammes
+│   │   │   └── ResponseModal.js # Affichage réponses
+│   │   └── common/           # Composants partagés
+│   ├── hooks/          # Custom hooks React
+│   │   ├── useAuth.js       # Gestion auth
+│   │   └── useTheme.js      # Gestion thème
+│   ├── contexts/       # Contexts React
+│   │   ├── AuthContext.js   # Context auth
+│   │   └── ThemeContext.js  # Context thème
+│   ├── services/       # Services API
+│   ├── utils/          # Utilitaires
+│   ├── styles/         # Styles CSS/SCSS
 │   ├── App.js          # Composant principal
-│   ├── App.css         # Styles principaux
 │   └── index.js        # Point d'entrée
-└── package.json        # Dépendances et scripts
+└── package.json        # Dépendances
 ```
 
 ## Fonctionnalités
 
 ### Éditeur de Diagrammes
-- Interface interactive basée sur React Flow
+- Interface interactive avec React Flow 11
 - Création et édition de nœuds d'agents
-- Connexions personnalisées entre les agents
+- Connexions personnalisées entre agents
 - Disposition automatique des nœuds
-- Zoom et navigation dans le diagramme
+- Zoom et navigation fluide
+- Annulation/Rétablissement (Undo/Redo)
+- Export PNG/SVG
 
 ### Gestion des Agents
-- Configuration des propriétés des agents :
+- Configuration complète des agents :
   - Nom et rôle
-  - Objectif
+  - Objectif et contexte
   - Histoire personnelle
   - Outils disponibles
-- Validation des configurations
+  - Paramètres avancés
+- Validation en temps réel
+- Templates prédéfinis
+- Import/Export de configurations
 
 ### Gestion des Workflows
-- Sauvegarde et chargement des diagrammes
+- Sauvegarde/Chargement de diagrammes
 - Exécution des workflows
-- Visualisation des résultats
-- Génération de diagrammes depuis des descriptions textuelles
+- Visualisation temps réel
+- Historique des exécutions
+- Génération depuis descriptions
+- Partage de workflows
 
-### Authentification et Profil
-- Connexion/Déconnexion utilisateur
-- Gestion du profil utilisateur
-- Sessions persistantes avec cookies
+### Interface Utilisateur
+- Design responsive
+- Mode sombre/clair
+- Support multilingue (FR/EN)
+- Thèmes personnalisables
+- Raccourcis clavier
+- Tour guidé pour nouveaux utilisateurs
 
 ## Dépendances Principales
 
 ```json
 {
   "dependencies": {
-    "react": "^18.x",
-    "react-dom": "^18.x",
-    "reactflow": "^11.x",
-    "react-bootstrap": "^2.x",
-    "js-cookie": "^3.x"
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "reactflow": "^11.8.0",
+    "react-bootstrap": "^2.9.0",
+    "js-cookie": "^3.0.5",
+    "i18next": "^23.5.0",
+    "react-i18next": "^13.2.0",
+    "@mantine/core": "^7.0.0",
+    "@mantine/hooks": "^7.0.0"
   }
 }
 ```
@@ -76,55 +101,104 @@ box8-react/
 npm install
 ```
 
-2. Créer un fichier `.env` à la racine :
+2. Créer un fichier `.env` :
 ```env
 REACT_APP_API_URL=http://localhost:8000
+REACT_APP_VERSION=1.0.0
+REACT_APP_DEFAULT_LANGUAGE=fr
 ```
 
 ## Scripts Disponibles
 
 ```bash
-# Démarrage en mode développement
+# Développement
 npm start
 
-# Build de production
+# Build production
 npm run build
 
-# Lancement des tests
+# Tests
 npm test
+npm run test:coverage
+
+# Linting
+npm run lint
+npm run lint:fix
+
+# Analyse des bundles
+npm run analyze
 ```
-
-## Utilisation
-
-### Création d'un Diagramme
-1. Cliquer sur le bouton "Nouveau Diagramme"
-2. Ajouter des agents en utilisant le menu flottant
-3. Configurer chaque agent via le modal de configuration
-4. Connecter les agents en glissant-déposant entre les points de connexion
-5. Sauvegarder le diagramme
-
-### Exécution d'un Workflow
-1. Charger un diagramme existant
-2. Cliquer sur le bouton "Exécuter"
-3. Suivre l'avancement dans le modal de réponse
 
 ## Développement
 
 ### Structure des Composants
-- Composants sans état pour l'UI
-- Hooks React pour la gestion d'état
-- Context API pour l'état global
-- Gestion des événements avec React Flow
+- Composants fonctionnels avec hooks
+- Props typées avec PropTypes/TypeScript
+- Memoization pour les performances
+- Tests unitaires avec Jest/RTL
+- Stories Storybook
 
-### Bonnes Pratiques
-- Composants modulaires et réutilisables
-- Gestion des états avec hooks personnalisés
-- Validation des props avec PropTypes
-- Gestion des erreurs et retours utilisateur
+### État Global
+- Context API pour l'état partagé
+- Custom hooks pour la logique réutilisable
+- Gestion du cache avec SWR
+- Persistance locale avec localStorage
 
-## Communication avec le Backend
+### Styles
+- CSS Modules pour l'isolation
+- Variables CSS pour la personnalisation
+- Support des thèmes
+- Animations fluides
+- Design system cohérent
 
-- Appels API RESTful
-- Gestion des tokens d'authentification
-- Validation des données
-- Gestion des erreurs réseau
+## Bonnes Pratiques
+
+### Performance
+- Code splitting automatique
+- Lazy loading des composants
+- Optimisation des images
+- Memoization des calculs coûteux
+- Debouncing des événements
+
+### Accessibilité
+- Support ARIA
+- Navigation au clavier
+- Contraste suffisant
+- Messages d'erreur clairs
+- Support lecteur d'écran
+
+### Tests
+- Tests unitaires
+- Tests d'intégration
+- Tests end-to-end
+- Tests de performance
+- Tests d'accessibilité
+
+## Déploiement
+
+1. Build de production :
+```bash
+npm run build
+```
+
+2. Servir avec nginx :
+```nginx
+server {
+    listen 80;
+    root /var/www/box8-react/build;
+    index index.html;
+    try_files $uri $uri/ /index.html;
+}
+```
+
+## Contribution
+
+1. Fork le projet
+2. Créer une branche (`git checkout -b feature/NewFeature`)
+3. Commit les changements (`git commit -m 'Add NewFeature'`)
+4. Push la branche (`git push origin feature/NewFeature`)
+5. Ouvrir une Pull Request
+
+## Licence
+
+MIT - Voir LICENSE pour plus de détails.
