@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Button } from 'react-bootstrap';
+import { Modal, Button, Collapse } from 'react-bootstrap';
 import { marked } from 'marked';
 import { downloadAsWord } from '../utils/documentUtils';
 import '../styles/markdown.css';
 
-const ResponseModal = ({ show, handleClose, message, diagramName = 'response' }) => {
+const ResponseModal = ({ show, handleClose, message, backstories = [], diagramName = 'response' }) => {
   const [htmlContent, setHtmlContent] = useState('');
+  const [showBackstories, setShowBackstories] = useState(false);
 
   const parseMarkdownTable = (tableContent) => {
     const lines = tableContent.trim().split('\n');
@@ -66,12 +67,36 @@ const ResponseModal = ({ show, handleClose, message, diagramName = 'response' })
       sanitize: false
     });
 
+    // Configurer le renderer pour gérer les barres de progression
+    const renderer = new marked.Renderer();
+    const defaultImageRenderer = renderer.image.bind(renderer);
+    renderer.image = (href, title, text) => {
+      if (text === 'Progress' && href.startsWith('https://progress-bar.dev/')) {
+        const percentage = href.split('/').pop();
+        return `
+          <div class="progress" style="height: 20px;">
+            <div 
+              class="progress-bar" 
+              role="progressbar" 
+              style="width: ${percentage}%;" 
+              aria-valuenow="${percentage}" 
+              aria-valuemin="0" 
+              aria-valuemax="100"
+            >
+              ${percentage}%
+            </div>
+          </div>
+        `;
+      }
+      return defaultImageRenderer(href, title, text);
+    };
+
     // Première passe : convertir le markdown en HTML
-    let processedContent = marked(content);
+    let processedContent = marked(content, { renderer });
 
     // Deuxième passe : extraire et convertir les tables des blocs de code
     processedContent = processedContent.replace(
-      /<pre><code class="language-markdown">([\s\S]*?)<\/code><\/pre>/g,
+      /<pre><code(?:\s+class=".*?")?>([^]*?)<\/code><\/pre>/g,
       (match, codeContent) => {
         if (codeContent.includes('|')) {
           const tableMatch = codeContent.match(/\|[\s\S]*?\n[\s\S]*?\|[\s\S]*?(?=\n\n|$)/g);
@@ -129,6 +154,32 @@ const ResponseModal = ({ show, handleClose, message, diagramName = 'response' })
           className="markdown-content"
           dangerouslySetInnerHTML={{ __html: htmlContent }}
         />
+        {backstories && backstories.length > 0 && (
+          <div className="mt-4">
+            <Button
+              onClick={() => setShowBackstories(!showBackstories)}
+              variant="outline-secondary"
+              className="mb-2"
+              aria-controls="backstories-collapse"
+              aria-expanded={showBackstories}
+            >
+              {showBackstories ? 'Masquer les détails' : 'Voir plus'}
+            </Button>
+            <Collapse in={showBackstories}>
+              <div id="backstories-collapse">
+                <div className="card card-body">
+                  <h5>Backstories des agents</h5>
+                  {backstories.map((backstory, index) => (
+                    <div key={index} className="mb-3">
+                      <h6>{backstory.name}</h6>
+                      <p>{backstory.backstory}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Collapse>
+          </div>
+        )}
       </Modal.Body>
       <Modal.Footer>
         <Button 

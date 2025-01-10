@@ -13,28 +13,52 @@ import {
 } from 'docx';
 
 const parseMarkdownTable = (tableContent) => {
-  const lines = tableContent.trim().split('\n');
-  if (lines.length < 3) return null;
+  try {
+    const lines = tableContent.trim().split('\n');
+    if (lines.length < 3) return null;
 
-  // Extraire l'en-tête
-  const headerCells = lines[0]
-    .split('|')
-    .filter(cell => cell.trim())
-    .map(cell => cell.trim());
+    // Vérifier si toutes les lignes commencent par | et se terminent par |
+    if (!lines.every(line => line.trim().startsWith('|') && line.trim().endsWith('|'))) {
+      return null;
+    }
 
-  // Extraire les lignes de données
-  const rows = lines.slice(2).map(line => 
-    line
+    // Extraire l'en-tête
+    const headerCells = lines[0]
       .split('|')
       .filter(cell => cell.trim())
-      .map(cell => cell.trim())
-  );
+      .map(cell => cell.trim());
 
-  return { headerCells, rows };
+    // Vérifier si l'en-tête est valide
+    if (headerCells.length === 0) return null;
+
+    // Vérifier si la ligne de séparation est valide
+    const separatorLine = lines[1].trim();
+    if (!separatorLine.match(/^\|[-:\|\s]+\|$/)) return null;
+
+    // Extraire les lignes de données
+    const rows = lines.slice(2).map(line => {
+      const cells = line
+        .split('|')
+        .filter(cell => cell.trim())
+        .map(cell => cell.trim());
+      
+      // Vérifier si la ligne a le même nombre de colonnes que l'en-tête
+      return cells.length === headerCells.length ? cells : null;
+    }).filter(row => row !== null);
+
+    // Retourner null si aucune ligne de données valide
+    return rows.length > 0 ? { headerCells, rows } : null;
+  } catch (error) {
+    console.error('Erreur lors du parsing de la table:', error);
+    return null;
+  }
 };
 
 const createTableFromMarkdown = (tableContent) => {
-  const { headerCells, rows } = parseMarkdownTable(tableContent);
+  const parsedTable = parseMarkdownTable(tableContent);
+  if (!parsedTable) return null;
+
+  const { headerCells, rows } = parsedTable;
   
   return new Table({
     width: {
@@ -96,13 +120,18 @@ export const downloadAsWord = async (markdownContent, filename = 'response') => 
         continue;
       } else if (isInTable && currentTable.length > 0) {
         // Fin de la table
-        children.push(createTableFromMarkdown(currentTable.join('\n')));
+        const table = createTableFromMarkdown(currentTable.join('\n'));
+        if (table) {
+          children.push(table);
+          // Ajouter un espace après la table
+          children.push(new Paragraph({ spacing: { after: 200 } }));
+        }
         currentTable = [];
         isInTable = false;
       }
 
       // Traitement normal pour les autres éléments
-      if (!isInTable) {
+      if (!isInTable && line.trim()) {
         if (line.startsWith('# ')) {
           children.push(new Paragraph({
             children: [new TextRun({
@@ -165,7 +194,11 @@ export const downloadAsWord = async (markdownContent, filename = 'response') => 
 
     // Gérer la dernière table si elle existe
     if (currentTable.length > 0) {
-      children.push(createTableFromMarkdown(currentTable.join('\n')));
+      const table = createTableFromMarkdown(currentTable.join('\n'));
+      if (table) {
+        children.push(table);
+        children.push(new Paragraph({ spacing: { after: 200 } }));
+      }
     }
 
     const doc = new Document({
@@ -175,11 +208,10 @@ export const downloadAsWord = async (markdownContent, filename = 'response') => 
       }]
     });
 
-    // Generate and save the document
-    Packer.toBlob(doc).then(blob => {
-      saveAs(blob, `${filename}.docx`);
-    });
+    const buffer = await Packer.toBlob(doc);
+    saveAs(buffer, `${filename}.docx`);
   } catch (error) {
     console.error('Error creating Word document:', error);
+    throw new Error(`Erreur lors de la création du document Word : ${error.message}`);
   }
 };

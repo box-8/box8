@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import ReactFlow, { 
   Controls, 
   Background,
@@ -34,32 +34,11 @@ const edgeTypes = {
   custom: CustomEdge,
 };
 
-const initialNodes = [
-  {
-    id: 'output',
-    type: 'output',
-    data: { 
-      label: 'Output',
-      name: 'Output',
-      role: 'output',
-      goal: 'Collect and format the final output',
-      backstory: 'I am responsible for collecting and formatting the final output of the process',
-      tools: [],
-      selected: false
-    },
-    position: { x: 250, y: 250 },
-    draggable: true,
-    connectable: false,
-  }
-];
-
 function Flow() {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState(null);
   const [selectedEdge, setSelectedEdge] = useState(null);
-  const [selectedAgent, setSelectedAgent] = useState(null);
-  const [selectedTask, setSelectedTask] = useState(null);
   const [showAgentModal, setShowAgentModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showDiagramModal, setShowDiagramModal] = useState(false);
@@ -72,15 +51,10 @@ function Flow() {
   const [user, setUser] = useState(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [responseMessage, setResponseMessage] = useState('');
-  const [diagramData, setDiagramData] = useState({ name: '', description: '' });
+  const [backstories, setBackstories] = useState([]);
   const [currentDiagramName, setCurrentDiagramName] = useState('');
   const [currentDiagramDescription, setCurrentDiagramDescription] = useState('');
-  const [isNewDiagram, setIsNewDiagram] = useState(false);
-  const [chatInput, setChatInput] = useState(''); // Ajouter l'état pour le chatInput
   const { fitView, getNodes, getEdges } = useReactFlow();
-
-  // État pour suivre si le diagramme a été chargé initialement
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   // Vérifier l'état de l'authentification au chargement
   useEffect(() => {
@@ -145,15 +119,30 @@ function Flow() {
   // Gestionnaire de déconnexion
   const handleLogout = async () => {
     try {
+      // Clear client-side state immediately
+      setIsAuthenticated(false);
+      setUser(null);
+      setShowProfileModal(false);
+
+      // Clear any session cookies manually
+      document.cookie = 'session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+
+      // Send logout request to server
       const response = await fetch('http://localhost:8000/auth/logout/', {
         method: 'POST',
         credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
       });
       
       if (response.ok) {
-        setIsAuthenticated(false);
-        setUser(null);
-        setShowProfileModal(false);
+        // Attendre 2 secondes avant de vérifier l'état de l'authentification
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Force a re-check of authentication status
+        await checkAuthStatus();
       }
     } catch (error) {
       console.error('Erreur lors de la déconnexion:', error);
@@ -172,22 +161,14 @@ function Flow() {
   // Gestionnaire de double-clic sur les nœuds
   const onNodeDoubleClick = useCallback((event, node) => {
     if (node.type === 'agent') {
-      setSelectedAgent({
-        key: node.id,
-        ...node.data
-      });
+      setSelectedNode(node);
       setShowAgentModal(true);
     }
   }, []);
 
   // Gestionnaire de double-clic sur les edges
   const onEdgeDoubleClick = useCallback((event, edge) => {
-    setSelectedTask({
-      id: edge.id,
-      from: edge.source,
-      to: edge.target,
-      ...edge.data
-    });
+    setSelectedEdge(edge);
     setShowTaskModal(true);
   }, []);
 
@@ -416,7 +397,7 @@ function Flow() {
     } else {
       console.error('Invalid diagram data structure:', diagramData);
     }
-  }, []); // No dependencies needed since we only use setState functions which are stable
+  }, [setEdges, setNodes, setCurrentDiagramName, setCurrentDiagramDescription]); // No dependencies needed since we only use setState functions which are stable
 
   const handleCreateCrewAI = useCallback((chatInput) => {
     // Récupérer les données du diagramme
@@ -457,6 +438,11 @@ function Flow() {
       console.log(data);
       if (data.status === 'success') {
         setResponseMessage(data.message);
+        // Use backstories directly from the backend response
+        setBackstories(data.backstories.map(b => ({
+          name: b.role,  // Use role as name
+          backstory: b.backstory
+        })));
         setShowResponseModal(true);
       } else {
         alert('Error creating CrewAI Process: ' + data.message);
@@ -466,7 +452,7 @@ function Flow() {
       console.error('Error:', error);
       alert('Error creating CrewAI Process: ' + error.message);
     });
-  }, [nodes, edges]);
+  }, [nodes, edges]); // Added nodes and edges as dependencies
 
   const handleNewDiagram = useCallback(() => {
     setShowNewDiagramModal(true);
@@ -490,10 +476,6 @@ function Flow() {
     };
     setNodes([outputNode]);
     setEdges([]);
-    setDiagramData({
-      name: data.name,
-      description: data.description
-    });
     setCurrentDiagramName(data.name);
     setCurrentDiagramDescription(data.description || '');
     setShowNewDiagramModal(false);
@@ -677,13 +659,12 @@ function Flow() {
 
   // Effet pour le chargement initial du diagramme
   useEffect(() => {
-    if (isInitialLoad && nodes.length > 0) {
+    if (nodes.length > 0) {
       setTimeout(() => {
         fitView({ padding: 0.2 });
-        setIsInitialLoad(false);
       }, 100);
     }
-  }, [nodes, isInitialLoad]);
+  }, [nodes, fitView]);
 
   return (
     <div style={{ width: '100vw', height: '100vh', background: '#ffffff' }}>
@@ -811,6 +792,7 @@ function Flow() {
         show={showResponseModal}
         handleClose={() => setShowResponseModal(false)}
         message={responseMessage}
+        backstories={backstories}
         diagramName={currentDiagramName}
       />
 

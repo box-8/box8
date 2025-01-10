@@ -204,8 +204,7 @@ async def generate_diagram_from_description(description: str, name: str = "Nouve
         # Créer et exécuter le crew
         crew = Crew(
             agents=[text_analyst, diagram_expert],
-            tasks=[analyze_text, create_diagram],
-            verbose=True
+            tasks=[analyze_text, create_diagram]
         )
 
         kickoff = await crew.kickoff_async()
@@ -309,6 +308,7 @@ async def execute_process_from_diagram(data: Dict, folder: str, llm: str = "open
         links = data['links']
         agents_dict = {}
         all_results = []
+        backstories = []  # Initialize backstories list
 
         # Initialiser les agents
         for node in data['nodes']:
@@ -316,7 +316,8 @@ async def execute_process_from_diagram(data: Dict, folder: str, llm: str = "open
                 role=node.get('role', ''),
                 goal=node.get('goal', ''),
                 backstory=node.get('backstory', ''),
-                llm=choose_llm(llm)
+                llm=choose_llm(llm),
+                verbose=False
             )
             
             if file := node.get('file', ''):
@@ -367,9 +368,6 @@ async def execute_process_from_diagram(data: Dict, folder: str, llm: str = "open
 
                 try:
                     crew = Crew(agents=[from_agent], tasks=[task])
-                    print(f"{MAGENTA}AGENT{END} : \n{RED}{from_agent.role}{END}")
-                    print(f"{MAGENTA}KICKOFF FOR TASK DESCRIPTION{END} : \n{RED}{task.description}{END}")
-                    print(f"{MAGENTA}EXPECTED OUTPUT{END} : \n{RED}{task.expected_output}{END}")
                     
                     kickoff = await crew.kickoff_async()
                     result = (
@@ -382,16 +380,26 @@ async def execute_process_from_diagram(data: Dict, folder: str, llm: str = "open
                     to_agent.backstory += f"\n\nRésultat de {from_agent.role} : {task.output.raw}"
                     all_results.append(result)
                     
-                    print(f"RESULT : \n\n{MAGENTA}{result}{END}")
-                    print(f"FROM BACKSTORY : \n\n{GREEN}{from_agent.backstory}{END}")
-                    print(f"TO BACKSTORY : \n\n{GREEN}{to_agent.backstory}{END}")
+                    # print(f"RESULT : \n\n{MAGENTA}{result}{END}")
+                    print(f"{MAGENTA}AGENT{END} : \n{RED}{from_agent.role}{END}")
+                    print(f"{MAGENTA}KICKOFF FOR TASK DESCRIPTION{END} : \n{RED}{task.description}{END}")
+                    print(f"{MAGENTA}EXPECTED OUTPUT{END} : \n{RED}{task.expected_output}{END}")
+                    print(f"{MAGENTA}FROM BACKSTORY{END} : \n\n{GREEN}{from_agent.backstory}{END}")
+                    # print(f"TO BACKSTORY : \n\n{GREEN}{to_agent.backstory}{END}")
 
                 except Exception as e:
                     print(f"Erreur lors de l'exécution de la tâche : {str(e)}")
 
+        for agent_key, agent in agents_dict.items():
+            backstories.append({
+                'role': agent.role,
+                'backstory': agent.backstory
+            })
+
         return {
             'status': 'success',
             'message': "\n".join(all_results),
+            'backstories': backstories,
             'branches_count': len(roots)
         }
 

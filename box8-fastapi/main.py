@@ -318,6 +318,7 @@ async def set_llm(request: Request, llm_data: LLMSelection):
     if not user:
         raise HTTPException(status_code=401, detail="Session invalide")
     
+    print(f"LLM sélectionné: {llm_data.llm}")
     response = JSONResponse(content={"message": "LLM sélectionné avec succès"})
     response.set_cookie(key="selected_llm", value=llm_data.llm)
     return response

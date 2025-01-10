@@ -13,7 +13,7 @@ const UserProfileModal = ({ show, onHide, user, onLogout }) => {
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
-  const [selectedLLM, setSelectedLLM] = useState('hosted');
+  const [selectedLLM, setSelectedLLM] = useState('openai');
   const fileInputRef = useRef();
 
   const saveLLMSelection = async (newLLM) => {
@@ -291,7 +291,7 @@ const UserProfileModal = ({ show, onHide, user, onLogout }) => {
         </Tabs>
       </Modal.Body>
       <Modal.Footer>
-        <Button variant="danger" onClick={onLogout}>
+        <Button variant="danger" onClick={handleLogout}>
           Se déconnecter
         </Button>
         <Button variant="secondary" onClick={onHide}>

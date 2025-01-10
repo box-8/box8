@@ -13,6 +13,9 @@ SECRET_KEY = "votre_clé_secrète_très_longue_et_complexe"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
+# Liste des tokens invalidés (blacklist)
+invalidated_tokens = set()
+
 # Configuration du hachage des mots de passe
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -66,27 +69,49 @@ def authenticate_user(email: str, password: str) -> Optional[User]:
         is_active=user.is_active
     )
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """Crée un token JWT"""
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
+        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    
+    to_encode.update({
+        "exp": expire.timestamp(),
+        "iat": datetime.now(timezone.utc).timestamp()
+    })
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
 def get_user_from_token(token: str) -> Optional[User]:
     """Récupère l'utilisateur à partir d'un token JWT"""
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        # Vérifier si le token est dans la blacklist
+        if token in invalidated_tokens:
+            return None
+
+        # Add verification options to check expiration
+        payload = jwt.decode(
+            token, 
+            SECRET_KEY, 
+            algorithms=[ALGORITHM],
+            options={"verify_exp": True}  # Enforce expiration check
+        )
+        
+        # Check if token is expired
+        exp = payload.get("exp")
+        if exp is None or datetime.fromtimestamp(exp, timezone.utc) < datetime.now(timezone.utc):
+            return None
+            
         email: str = payload.get("sub")
         if email is None:
             return None
+            
         user_db = get_user(email)
         if user_db is None:
             return None
+            
         return User(
             id=user_db.id,
             email=user_db.email,
@@ -124,23 +149,24 @@ async def login(response: Response, user_data: UserLogin):
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email ou mot de passe incorrect",
-            headers={"WWW-Authenticate": "Bearer"},
+            detail="Email ou mot de passe incorrect"
         )
     
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    # Create token with expiration
     access_token = create_access_token(
-        data={"sub": user.email}, expires_delta=access_token_expires
+        data={"sub": user.email},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     
-    # Définir le cookie de session
+    # Set session cookie with same expiration as token
     response.set_cookie(
         key="session",
         value=access_token,
         httponly=True,
-        secure=False,  # Mettre à True en production avec HTTPS
+        secure=False,  # Set to True if using HTTPS
         samesite="lax",
-        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # Convert minutes to seconds
+        path="/"
     )
     
     return {
@@ -154,9 +180,19 @@ async def login(response: Response, user_data: UserLogin):
     }
 
 @router.post("/auth/logout/")
-async def logout(response: Response):
+async def logout(response: Response, session: Optional[str] = Cookie(None)):
     """Endpoint de déconnexion qui supprime la session"""
-    response.delete_cookie(key="session")
+    if session:
+        # Ajouter le token à la blacklist
+        invalidated_tokens.add(session)
+        
+    response.delete_cookie(
+        key="session",
+        path="/",  # Important: must match the path used when setting the cookie
+        secure=False,  # Set to True if using HTTPS
+        httponly=True,
+        samesite="lax"
+    )
     return {"authenticated": False}
 
 @router.get("/auth/me/")
