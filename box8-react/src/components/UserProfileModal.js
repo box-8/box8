@@ -166,8 +166,11 @@ const UserProfileModal = ({ show, onHide, user, onLogout }) => {
               <h4>Informations du profil</h4>
               <p><strong>Email:</strong> {user?.email}</p>
               <p><strong>Nom d'utilisateur:</strong> {user?.username}</p>
-              <p><strong>Nom:</strong> {user?.name}</p>
+
             </div>
+            <Button variant="danger" onClick={handleLogout}>
+          Se déconnecter
+        </Button>
           </Tab>
 
           {/* Files Tab */}
@@ -291,9 +294,7 @@ const UserProfileModal = ({ show, onHide, user, onLogout }) => {
         </Tabs>
       </Modal.Body>
       <Modal.Footer>
-        <Button variant="danger" onClick={handleLogout}>
-          Se déconnecter
-        </Button>
+        
         <Button variant="secondary" onClick={onHide}>
           Fermer
         </Button>
