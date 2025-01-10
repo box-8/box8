@@ -302,7 +302,7 @@ async def delete_user_file(request: Request, filename: str):
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Fichier non trouvé")
     
-    try:
+    try: 
         os.remove(file_path)
         return {"success": True}
     except Exception as e:

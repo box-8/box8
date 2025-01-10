@@ -40,7 +40,7 @@ def choose_llm(name: str = "") -> LLM:
     llm_configs = {
         "hosted": {
             "model": "hosted_vllm/cognitivecomputations/dolphin-2.9-llama3-8b",
-            "base_url": "https://fekwxplqzkk1uk-8000.proxy.runpod.net/v1",
+            "base_url": "https://1yq4yjjl8ydge2-8000.proxy.runpod.net/v1",
             "api_key": "token-abc123",
         },
         "local": {
