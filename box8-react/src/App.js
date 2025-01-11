@@ -829,6 +829,7 @@ function Flow() {
         hasDiagram={nodes.length > 0}
         currentDiagramName={currentDiagramName}
         hasResponse={!!responseMessage}
+        isAuthenticated={isAuthenticated}
       />
 
       <AgentModal

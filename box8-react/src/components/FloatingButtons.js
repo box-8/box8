@@ -13,7 +13,8 @@ const FloatingButtons = ({
   onShowResponse,
   hasDiagram,
   currentDiagramName,
-  hasResponse
+  hasResponse,
+  isAuthenticated
 }) => {
   const [chatInput, setChatInput] = useState('');
 
@@ -24,14 +25,16 @@ const FloatingButtons = ({
 
   return (
     <div className="floating-buttons">
-      <Button
-        variant="secondary"
-        className="floating-button"
-        onClick={onLoadDiagram}
-        title="Load Diagram"
-      >
-        <i className="bi bi-folder2-open"></i>
-      </Button>
+      {isAuthenticated && (
+        <Button
+          variant="secondary"
+          className="floating-button"
+          onClick={onLoadDiagram}
+          title="Load Diagram"
+        >
+          <i className="bi bi-folder2-open"></i>
+        </Button>
+      )}
 
       {/* Bouton New Diagram commenté car déplacé dans JsonFilesModal
       <Button
