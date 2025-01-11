@@ -15,6 +15,7 @@ class UserLogin(BaseModel):
 class User(UserBase):
     id: str
     is_active: bool = True
+    is_admin: bool = False
     
     class Config:
         from_attributes = True

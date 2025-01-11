@@ -16,7 +16,8 @@ def init_db():
             username TEXT NOT NULL UNIQUE,
             email TEXT UNIQUE NOT NULL,
             hashed_password TEXT NOT NULL,
-            is_active BOOLEAN NOT NULL DEFAULT 1
+            is_active BOOLEAN NOT NULL DEFAULT 1,
+            is_admin BOOLEAN NOT NULL DEFAULT 0
         )
         ''')
         db.commit()
@@ -69,20 +70,21 @@ def create_user(user_data: dict) -> None:
     with get_db() as db:
         cursor = db.cursor()
         cursor.execute('''
-        INSERT INTO users (id, username, email, hashed_password, is_active)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO users (id, username, email, hashed_password, is_active, is_admin)
+        VALUES (?, ?, ?, ?, ?, ?)
         ''', (
             user_data['id'],
             user_data['username'],
             user_data['email'],
             user_data['hashed_password'],
-            user_data['is_active']
+            user_data['is_active'],
+            user_data.get('is_admin', False)
         ))
         db.commit()
 
 def update_user(user_id: str, update_data: dict) -> None:
     """Met à jour les informations d'un utilisateur"""
-    allowed_fields = {'username', 'email', 'hashed_password', 'is_active'}
+    allowed_fields = {'username', 'email', 'hashed_password', 'is_active', 'is_admin'}
     update_fields = {k: v for k, v in update_data.items() if k in allowed_fields}
     
     if not update_fields:
@@ -102,6 +104,14 @@ def delete_user(user_id: str) -> None:
         cursor = db.cursor()
         cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
         db.commit()
+
+def promote_to_admin(email: str) -> bool:
+    """Promouvoir un utilisateur au rang d'administrateur"""
+    with get_db() as db:
+        cursor = db.cursor()
+        cursor.execute('UPDATE users SET is_admin = 1 WHERE email = ?', (email,))
+        db.commit()
+        return cursor.rowcount > 0
 
 # Initialisation de la base de données au démarrage
 if not os.path.exists(DATABASE_PATH):

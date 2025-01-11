@@ -39,19 +39,16 @@ def get_password_hash(password: str) -> str:
     """Génère un hash pour le mot de passe"""
     return pwd_context.hash(password)
 
-def get_user(email: str) -> Optional[UserInDB]:
+def get_user(email: str) -> Optional[dict]:
     """Récupère un utilisateur par son email"""
-    user_dict = get_user_by_email(email)
-    if user_dict:
-        return UserInDB(**user_dict)
-    return None
+    return get_user_by_email(email)
 
-def authenticate_user(email: str, password: str) -> Optional[UserInDB]:
+def authenticate_user(email: str, password: str) -> Optional[dict]:
     """Authentifie un utilisateur"""
     user = get_user(email)
     if not user:
         return None
-    if not verify_password(password, user.hashed_password):
+    if not verify_password(password, user["hashed_password"]):
         return None
     return user
 
@@ -66,37 +63,33 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def get_user_from_token(token: str) -> Optional[User]:
-    """Récupère l'utilisateur à partir d'un token JWT"""
-    try:
-        # Vérifier si le token est dans la blacklist
-        if token in invalidated_tokens:
-            return None
-
-        # Décoder et vérifier le token
-        payload = jwt.decode(
-            token,
-            SECRET_KEY,
-            algorithms=[ALGORITHM],
-            options={"verify_exp": True}
+async def get_current_user(session: Optional[str] = Cookie(None)) -> Optional[dict]:
+    """Récupère l'utilisateur actuellement connecté à partir du cookie de session"""
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Non authentifié"
         )
-
+    try:
+        payload = jwt.decode(session, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
         if email is None:
-            return None
-
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token invalide"
+            )
         user = get_user(email)
         if user is None:
-            return None
-
-        return User(
-            id=user.id,
-            email=user.email,
-            username=user.username,
-            is_active=user.is_active
-        )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Utilisateur non trouvé"
+            )
+        return user
     except JWTError:
-        return None
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token invalide"
+        )
 
 @router.post("/register", response_model=User)
 async def register(user_data: UserRegistration):
@@ -115,7 +108,8 @@ async def register(user_data: UserRegistration):
         "username": user_data.username,
         "email": user_data.email,
         "hashed_password": get_password_hash(user_data.password),
-        "is_active": True
+        "is_active": True,
+        "is_admin": False
     }
     
     try:
@@ -139,7 +133,7 @@ async def login(response: Response, user_data: UserLogin):
 
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.email},
+        data={"sub": user["email"]},
         expires_delta=access_token_expires
     )
 
@@ -156,10 +150,11 @@ async def login(response: Response, user_data: UserLogin):
     return {
         "authenticated": True,
         "user": {
-            "id": user.id,
-            "email": user.email,
-            "username": user.username,
-            "is_active": user.is_active
+            "id": user["id"],
+            "email": user["email"],
+            "username": user["username"],
+            "is_active": user["is_active"],
+            "is_admin": user["is_admin"]
         }
     }
 
@@ -182,30 +177,25 @@ async def check_auth(response: Response, session: Optional[str] = Cookie(None)):
     if not session:
         return {"authenticated": False}
 
-    user = get_user_from_token(session)
+    user = await get_current_user(session)
     if not user:
         return {"authenticated": False}
 
     return {
         "authenticated": True,
         "user": {
-            "id": user.id,
-            "email": user.email,
-            "username": user.username,
-            "is_active": user.is_active
+            "id": user["id"],
+            "email": user["email"],
+            "username": user["username"],
+            "is_active": user["is_active"],
+            "is_admin": user["is_admin"]
         }
     }
 
 @router.get("/me/")
 async def read_users_me(response: Response, session: Optional[str] = Cookie(None)):
     """Récupère les informations de l'utilisateur connecté"""
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Non authentifié"
-        )
-
-    user = get_user_from_token(session)
+    user = await get_current_user(session)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -213,10 +203,11 @@ async def read_users_me(response: Response, session: Optional[str] = Cookie(None
         )
 
     return {
-        "id": user.id,
-        "email": user.email,
-        "username": user.username,
-        "is_active": user.is_active
+        "id": user["id"],
+        "email": user["email"],
+        "username": user["username"],
+        "is_active": user["is_active"],
+        "is_admin": user["is_admin"]
     }
 
 # Initialisation de la base de données au démarrage

@@ -6,6 +6,7 @@ import Form from 'react-bootstrap/Form';
 import ListGroup from 'react-bootstrap/ListGroup';
 import Tabs from 'react-bootstrap/Tabs';
 import Tab from 'react-bootstrap/Tab';
+import Table from 'react-bootstrap/Table';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 
 const UserProfileModal = ({ show, onHide, user, onLogout }) => {
@@ -14,6 +15,7 @@ const UserProfileModal = ({ show, onHide, user, onLogout }) => {
   const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
   const [selectedLLM, setSelectedLLM] = useState('openai');
+  const [users, setUsers] = useState([]);
   const fileInputRef = useRef();
 
   const saveLLMSelection = async (newLLM) => {
@@ -147,6 +149,80 @@ const UserProfileModal = ({ show, onHide, user, onLogout }) => {
     }
   };
 
+  // Fonction pour charger la liste des utilisateurs
+  const loadUsers = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/admin/users', {
+        credentials: 'include'
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUsers(data);
+      } else {
+        setError('Erreur lors du chargement des utilisateurs');
+      }
+    } catch (err) {
+      setError('Erreur de connexion au serveur');
+    }
+  };
+
+  // Charger les utilisateurs quand l'onglet admin est sélectionné
+  useEffect(() => {
+    if (show && activeTab === 'admin' && user?.is_admin) {
+      loadUsers();
+    }
+  }, [show, activeTab]);
+
+  const handleToggleAdmin = async (userId) => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/admin/users/${userId}/toggle-admin`, {
+        method: 'PUT',
+        credentials: 'include'
+      });
+      if (response.ok) {
+        loadUsers();
+      } else {
+        setError('Erreur lors de la modification du statut admin');
+      }
+    } catch (err) {
+      setError('Erreur de connexion au serveur');
+    }
+  };
+
+  const handleToggleActive = async (userId) => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/admin/users/${userId}/toggle-active`, {
+        method: 'PUT',
+        credentials: 'include'
+      });
+      if (response.ok) {
+        loadUsers();
+      } else {
+        setError('Erreur lors de la modification du statut actif');
+      }
+    } catch (err) {
+      setError('Erreur de connexion au serveur');
+    }
+  };
+
+  const handleDeleteUser = async (userId) => {
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?')) {
+      try {
+        const response = await fetch(`http://localhost:8000/api/admin/users/${userId}`, {
+          method: 'DELETE',
+          credentials: 'include'
+        });
+        if (response.ok) {
+          loadUsers();
+        } else {
+          setError('Erreur lors de la suppression de l\'utilisateur');
+        }
+      } catch (err) {
+        setError('Erreur de connexion au serveur');
+      }
+    }
+  };
+
   return (
     <Modal show={show} onHide={onHide} size="lg">
       <Modal.Header closeButton>
@@ -154,7 +230,6 @@ const UserProfileModal = ({ show, onHide, user, onLogout }) => {
       </Modal.Header>
       <Modal.Body>
         {error && <Alert variant="danger">{error}</Alert>}
-        
         <Tabs
           activeKey={activeTab}
           onSelect={(k) => setActiveTab(k)}
@@ -291,6 +366,61 @@ const UserProfileModal = ({ show, onHide, user, onLogout }) => {
               </Form>
             </div>
           </Tab>
+
+          {/* Admin Tab */}
+          {user?.is_admin && (
+            <Tab eventKey="admin" title="Administration">
+              <Table striped bordered hover>
+                <thead>
+                  <tr>
+                    <th>Utilisateur</th>
+                    <th>Email</th>
+                    <th>Statut</th>
+                    <th>Admin</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((u) => (
+                    <tr key={u.id}>
+                      <td>{u.username}</td>
+                      <td>{u.email}</td>
+                      <td>
+                        <Button
+                          variant={u.is_active ? "success" : "secondary"}
+                          size="sm"
+                          onClick={() => handleToggleActive(u.id)}
+                          disabled={u.id === user.id}
+                        >
+                          {u.is_active ? "Actif" : "Inactif"}
+                        </Button>
+                      </td>
+                      <td>
+                        <Button
+                          variant={u.is_admin ? "warning" : "secondary"}
+                          size="sm"
+                          onClick={() => handleToggleAdmin(u.id)}
+                          disabled={u.id === user.id}
+                        >
+                          {u.is_admin ? "Admin" : "Utilisateur"}
+                        </Button>
+                      </td>
+                      <td>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => handleDeleteUser(u.id)}
+                          disabled={u.id === user.id}
+                        >
+                          <i className="bi bi-trash"></i>
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            </Tab>
+          )}
         </Tabs>
       </Modal.Body>
       <Modal.Footer>

@@ -1,21 +1,21 @@
 from fastapi import FastAPI, Request, HTTPException, UploadFile, File, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from app.auth.auth import (
+from app.routes.auth import (
     router as auth_router,
-    get_user_from_token,
-    create_access_token,
-    ACCESS_TOKEN_EXPIRE_MINUTES
+    get_current_user
 )
+from app.routes.admin import router as admin_router
 import json
 import os
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 from app.services.diagram_service import (execute_process_from_diagram, 
                                         generate_diagram_from_description,
                                         ask_process_from_diagram)
 import aiofiles
 from datetime import timedelta
+from app.auth.auth import create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 
 # Initialisation de l'application avec configuration des slashes
 app = FastAPI(
@@ -49,11 +49,13 @@ async def extend_session_middleware(request: Request, call_next):
     if session:
         # Créer un nouveau token avec une durée prolongée
         try:
-            user = get_user_from_token(session)
+            # Vérifier si l'utilisateur est valide
+            user = await get_current_user(session)
             if user:
                 access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
                 access_token = create_access_token(
-                    data={"sub": user.email}, expires_delta=access_token_expires
+                    data={"sub": user["email"]},
+                    expires_delta=access_token_expires
                 )
                 
                 # Mettre à jour le cookie de session
@@ -61,18 +63,21 @@ async def extend_session_middleware(request: Request, call_next):
                     key="session",
                     value=access_token,
                     httponly=True,
-                    secure=False,  # Mettre à True en production avec HTTPS
+                    max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
                     samesite="lax",
-                    max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60
+                    secure=False  # Mettre à True en production avec HTTPS
                 )
-        except:
-            # En cas d'erreur, ne pas bloquer la réponse
+        except HTTPException:
+            # Si le token est invalide, on ne fait rien
             pass
     
     return response
 
 # Inclusion des routes d'authentification
-app.include_router(auth_router)
+app.include_router(auth_router, prefix="/auth", tags=["authentication"])
+
+# Inclusion des routes d'administration
+app.include_router(admin_router, prefix="/api/admin", tags=["admin"])
 
 # Modèle pour les données de diagramme
 class DiagramData(BaseModel):
@@ -143,7 +148,7 @@ async def save_diagram(request: Request, data: DiagramSave):
     if not session:
         raise HTTPException(status_code=401, detail="Non authentifié")
     
-    user = get_user_from_token(session)
+    user = await get_current_user(session)
     if not user:
         raise HTTPException(status_code=401, detail="Session invalide")
     
@@ -186,13 +191,13 @@ async def designer_launch_crewai(request: Request):
     if not session:
         raise HTTPException(status_code=401, detail="Non authentifié")
     
-    user = get_user_from_token(session)
+    user = await get_current_user(session)
     if not user:
         raise HTTPException(status_code=401, detail="Session invalide")
 
     try:
         data = await request.json()
-        user_folder = get_user_folder(user.email)
+        user_folder = get_user_folder(user["email"])
         llm = request.cookies.get("selected_llm", 'openai')
         chat_input = data.get('chatInput', '')
         
@@ -218,7 +223,7 @@ async def generate_diagram(request: Request, data: DiagramDescription):
     if not session:
         raise HTTPException(status_code=401, detail="Non authentifié")
     
-    user = get_user_from_token(session)
+    user = await get_current_user(session)
     if not user:
         raise HTTPException(status_code=401, detail="Session invalide")
     
@@ -237,11 +242,11 @@ async def get_user_files(request: Request):
     if not session:
         raise HTTPException(status_code=401, detail="Non authentifié")
     
-    user = get_user_from_token(session)
+    user = await get_current_user(session)
     if not user:
         raise HTTPException(status_code=401, detail="Session invalide")
     
-    user_folder = get_user_folder(user.email)
+    user_folder = get_user_folder(user["email"])
     try:
         files = []
         for f in os.listdir(user_folder):
@@ -263,14 +268,14 @@ async def upload_user_file(request: Request, file: UploadFile = File(...)):
     if not session:
         raise HTTPException(status_code=401, detail="Non authentifié")
     
-    user = get_user_from_token(session)
+    user = await get_current_user(session)
     if not user:
         raise HTTPException(status_code=401, detail="Session invalide")
     
     if not file.filename.endswith(('.pdf', '.docx')):
         raise HTTPException(status_code=400, detail="Seuls les fichiers PDF et DOCX sont acceptés")
     
-    user_folder = get_user_folder(user.email)
+    user_folder = get_user_folder(user["email"])
     try:
         file_path = os.path.join(user_folder, file.filename)
         
@@ -292,11 +297,11 @@ async def delete_user_file(request: Request, filename: str):
     if not session:
         raise HTTPException(status_code=401, detail="Non authentifié")
     
-    user = get_user_from_token(session)
+    user = await get_current_user(session)
     if not user:
         raise HTTPException(status_code=401, detail="Session invalide")
     
-    user_folder = get_user_folder(user.email)
+    user_folder = get_user_folder(user["email"])
     file_path = os.path.join(user_folder, filename)
     
     if not os.path.exists(file_path):
@@ -314,7 +319,7 @@ async def set_llm(request: Request, llm_data: LLMSelection):
     if not session:
         raise HTTPException(status_code=401, detail="Non authentifié")
     
-    user = get_user_from_token(session)
+    user = await get_current_user(session)
     if not user:
         raise HTTPException(status_code=401, detail="Session invalide")
     
