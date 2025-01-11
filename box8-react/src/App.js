@@ -143,6 +143,11 @@ function Flow() {
         
         // Force a re-check of authentication status
         await checkAuthStatus();
+        // Réinitialiser le diagramme
+        setNodes([]);
+        setEdges([]);
+        setCurrentDiagramName('');
+        setResponseMessage('');
       }
     } catch (error) {
       console.error('Erreur lors de la déconnexion:', error);

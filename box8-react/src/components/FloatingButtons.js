@@ -47,7 +47,7 @@ const FloatingButtons = ({
       </Button>
       */}
 
-      {hasDiagram && (
+      {hasDiagram && isAuthenticated && (
         <>
           <Button
             variant="info"
