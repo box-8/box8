@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request, HTTPException, UploadFile, File, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from app.routes.auth import (
     router as auth_router,
     get_current_user
@@ -313,7 +313,34 @@ async def delete_user_file(request: Request, filename: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/set-llm")
+@app.get("/designer/get_user_file/{filename}")
+async def get_user_file(request: Request, filename: str):
+    """Récupère un fichier spécifique de l'utilisateur"""
+    session = request.cookies.get("session")
+    if not session:
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    
+    user = await get_current_user(session)
+    if not user:
+        raise HTTPException(status_code=401, detail="Session invalide")
+    
+    user_folder = get_user_folder(user["email"])
+    file_path = os.path.join(user_folder, filename)
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Fichier non trouvé")
+    
+    # Détermine le type MIME en fonction de l'extension du fichier
+    if filename.lower().endswith('.pdf'):
+        media_type = 'application/pdf'
+    elif filename.lower().endswith('.docx'):
+        media_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    else:
+        raise HTTPException(status_code=400, detail="Type de fichier non supporté")
+    
+    return FileResponse(file_path, media_type=media_type, filename=filename)
+
+@app.post("/designer/set-llm")
 async def set_llm(request: Request, llm_data: LLMSelection):
     session = request.cookies.get("session")
     if not session:

@@ -18,9 +18,13 @@ const UserProfileModal = ({ show, onHide, user, onLogout }) => {
   const [users, setUsers] = useState([]);
   const fileInputRef = useRef();
 
+  const getFileUrl = (fileName) => {
+    return `http://localhost:8000/designer/get_user_file/${encodeURIComponent(fileName)}`;
+  };
+
   const saveLLMSelection = async (newLLM) => {
     try {
-      const response = await fetch('http://localhost:8000/api/set-llm', {
+      const response = await fetch('http://localhost:8000/designer/set-llm', {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -277,7 +281,17 @@ const UserProfileModal = ({ show, onHide, user, onLogout }) => {
                     className="d-flex justify-content-between align-items-center"
                   >
                     <div>
-                      <div>{file.name}</div>
+                      <div className="d-flex align-items-center">
+                        <span>{file.name}</span>
+                        <Button 
+                          variant="link" 
+                          size="sm" 
+                          className="ms-2 p-0"
+                          onClick={() => window.open(getFileUrl(file.name), '_blank')}
+                        >
+                          <i className="bi bi-box-arrow-up-right"></i>
+                        </Button>
+                      </div>
                       <small className="text-muted">
                         {formatFileSize(file.size)} • Modifié le {formatDate(file.modified)}
                       </small>
