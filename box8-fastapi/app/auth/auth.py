@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Optional, Set
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Cookie
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
@@ -20,7 +20,7 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 # Liste des tokens invalidés (blacklist)
-invalidated_tokens = set()
+invalidated_tokens: Set[str] = set()
 
 # Configuration du hachage des mots de passe
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -63,6 +63,14 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
+def invalidate_token(token: str) -> None:
+    """Ajoute un token à la blacklist"""
+    invalidated_tokens.add(token)
+
+def is_token_valid(token: str) -> bool:
+    """Vérifie si un token est valide (non blacklisté)"""
+    return token not in invalidated_tokens
+
 async def get_current_user(session: Optional[str] = Cookie(None)) -> Optional[dict]:
     """Récupère l'utilisateur actuellement connecté à partir du cookie de session"""
     if not session:
@@ -70,6 +78,14 @@ async def get_current_user(session: Optional[str] = Cookie(None)) -> Optional[di
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Non authentifié"
         )
+
+    # Vérifier si le token est dans la blacklist
+    if not is_token_valid(session):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session invalide"
+        )
+
     try:
         payload = jwt.decode(session, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
@@ -162,7 +178,7 @@ async def login(response: Response, user_data: UserLogin):
 async def logout(response: Response, session: Optional[str] = Cookie(None)):
     """Endpoint de déconnexion qui supprime la session"""
     if session:
-        invalidated_tokens.add(session)
+        invalidate_token(session)
     
     response.delete_cookie(
         key="session",

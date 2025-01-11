@@ -34,7 +34,14 @@ def get_db():
 def dict_factory(cursor, row):
     """Convertit les lignes de la base de données en dictionnaires"""
     fields = [column[0] for column in cursor.description]
-    return {key: value for key, value in zip(fields, row)}
+    result = {}
+    for key, value in zip(fields, row):
+        # Convertir explicitement les booléens
+        if key in ('is_active', 'is_admin'):
+            result[key] = bool(value)
+        else:
+            result[key] = value
+    return result
 
 def get_user_by_email(email: str) -> Optional[dict]:
     """Récupère un utilisateur par son email"""
@@ -54,11 +61,15 @@ def get_user_by_username(username: str) -> Optional[dict]:
 
 def check_user_exists(email: str, username: str) -> Tuple[bool, str]:
     """Vérifie si un utilisateur avec l'email ou le nom d'utilisateur existe déjà"""
+    print(f"Vérification de l'existence de l'utilisateur - Email: {email}, Username: {username}")  # Log
     with get_db() as db:
         cursor = db.cursor()
-        cursor.execute('SELECT email, username FROM users WHERE email = ? OR username = ?', 
-                      (email, username))
+        query = 'SELECT email, username FROM users WHERE email = ? OR username = ?'
+        params = (email, username)
+        print(f"Exécution de la requête: {query} avec params: {params}")  # Log
+        cursor.execute(query, params)
         result = cursor.fetchone()
+        print(f"Résultat de la requête: {result}")  # Log
         if result:
             if result[0] == email:
                 return True, "Email déjà enregistré"
@@ -67,20 +78,32 @@ def check_user_exists(email: str, username: str) -> Tuple[bool, str]:
 
 def create_user(user_data: dict) -> None:
     """Crée un nouvel utilisateur dans la base de données"""
-    with get_db() as db:
-        cursor = db.cursor()
-        cursor.execute('''
-        INSERT INTO users (id, username, email, hashed_password, is_active, is_admin)
-        VALUES (?, ?, ?, ?, ?, ?)
-        ''', (
-            user_data['id'],
-            user_data['username'],
-            user_data['email'],
-            user_data['hashed_password'],
-            user_data['is_active'],
-            user_data.get('is_admin', False)
-        ))
-        db.commit()
+    print(f"Création d'un nouvel utilisateur: {user_data['email']}")  # Log
+    try:
+        with get_db() as db:
+            cursor = db.cursor()
+            query = '''
+            INSERT INTO users (id, username, email, hashed_password, is_active, is_admin)
+            VALUES (?, ?, ?, ?, ?, ?)
+            '''
+            params = (
+                user_data['id'],
+                user_data['username'],
+                user_data['email'],
+                user_data['hashed_password'],
+                user_data['is_active'],
+                user_data.get('is_admin', False)
+            )
+            print(f"Exécution de la requête: {query} avec params: {params}")  # Log
+            cursor.execute(query, params)
+            db.commit()
+            print("Utilisateur créé avec succès dans la base de données")  # Log
+    except sqlite3.IntegrityError as e:
+        print(f"Erreur d'intégrité SQLite: {str(e)}")  # Log
+        raise Exception(f"Erreur d'intégrité de la base de données: {str(e)}")
+    except Exception as e:
+        print(f"Erreur inattendue: {str(e)}")  # Log
+        raise
 
 def update_user(user_id: str, update_data: dict) -> None:
     """Met à jour les informations d'un utilisateur"""
