@@ -83,8 +83,7 @@ const ResponseModal = ({ show, handleClose, message, backstories = [], diagramNa
               aria-valuemin="0" 
               aria-valuemax="100"
             >
-              ${percentage}%
-            </div>
+              ${percentage}%</div>
           </div>
         `;
       }
@@ -172,7 +171,11 @@ const ResponseModal = ({ show, handleClose, message, backstories = [], diagramNa
                   {backstories.map((backstory, index) => (
                     <div key={index} className="mb-3">
                       <h6>{backstory.name}</h6>
-                      <p>{backstory.backstory}</p>
+                      <div 
+                        dangerouslySetInnerHTML={{ 
+                          __html: processMarkdown(backstory.backstory) 
+                        }}
+                      />
                     </div>
                   ))}
                 </div>

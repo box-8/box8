@@ -20,6 +20,7 @@ import DiagramModal from './components/DiagramModal';
 import DiagramModalNew from './components/DiagramModalNew';
 import ResponseModal from './components/ResponseModal';
 import JsonFilesModal from './components/JsonFilesModal';
+import ProcessProgress from './components/ProcessProgress';
 import Button from 'react-bootstrap/Button';
 import Cookies from 'js-cookie';
 import LoginModal from './components/LoginModal';
@@ -54,6 +55,8 @@ function Flow() {
   const [backstories, setBackstories] = useState([]);
   const [currentDiagramName, setCurrentDiagramName] = useState('');
   const [currentDiagramDescription, setCurrentDiagramDescription] = useState('');
+  const [showProgress, setShowProgress] = useState(false);
+  const [progress, setProgress] = useState(0);
   const { fitView, getNodes, getEdges } = useReactFlow();
 
   // Vérifier l'état de l'authentification au chargement
@@ -405,6 +408,10 @@ function Flow() {
   }, [setEdges, setNodes, setCurrentDiagramName, setCurrentDiagramDescription]); // No dependencies needed since we only use setState functions which are stable
 
   const handleCreateCrewAI = useCallback((chatInput) => {
+    // Réinitialiser et afficher la progression
+    setProgress(0);
+    setShowProgress(true);
+
     // Récupérer les données du diagramme
     const diagramData = {
       nodes: nodes.map(node => ({
@@ -418,7 +425,7 @@ function Flow() {
         expected_output: edge.data?.expected_output,
         relationship: edge.data?.relationship
       })),
-      chatInput: chatInput // Ajouter le chatInput aux données envoyées
+      chatInput: chatInput
     };
     
     var csrf = Cookies.get('csrftoken');
@@ -441,11 +448,11 @@ function Flow() {
     })
     .then(data => {
       console.log(data);
+      setShowProgress(false);
       if (data.status === 'success') {
         setResponseMessage(data.message);
-        // Use backstories directly from the backend response
         setBackstories(data.backstories.map(b => ({
-          name: b.role,  // Use role as name
+          name: b.role,
           backstory: b.backstory
         })));
         setShowResponseModal(true);
@@ -454,10 +461,22 @@ function Flow() {
       }
     })
     .catch(error => {
+      setShowProgress(false);
       console.error('Error:', error);
       alert('Error creating CrewAI Process: ' + error.message);
     });
-  }, [nodes, edges]); // Added nodes and edges as dependencies
+
+    // Simuler la progression pendant l'exécution
+    const progressInterval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return prev;
+        }
+        return prev + 10;
+      });
+    }, 1000);
+  }, [nodes, edges]);
 
   const handleNewDiagram = useCallback(() => {
     setShowNewDiagramModal(true);
@@ -908,6 +927,12 @@ function Flow() {
         onHide={() => setShowProfileModal(false)}
         user={user}
         onLogout={handleLogout}
+      />
+
+      <ProcessProgress
+        show={showProgress}
+        progress={progress}
+        onHide={() => setShowProgress(false)}
       />
     </div>
   );
