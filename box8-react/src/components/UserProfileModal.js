@@ -376,6 +376,14 @@ const UserProfileModal = ({ show, onHide, user, onLogout }) => {
                     checked={selectedLLM === 'mistral'}
                     onChange={() => handleLLMChange('mistral')}
                   />
+                  <Form.Check
+                    type="radio"
+                    id="local"
+                    name="llm"
+                    label="ollama/mistral"
+                    checked={selectedLLM === 'local'}
+                    onChange={() => handleLLMChange('local')}
+                  />
                 </Form.Group>
               </Form>
             </div>

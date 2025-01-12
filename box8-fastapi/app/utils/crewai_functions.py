@@ -30,7 +30,7 @@ def choose_llm(name: str = "") -> LLM:
     
     Args:
         name (str): Nom du modèle à utiliser
-        
+    ollama run gemma2:2b
     Returns:
         LLM: Instance du modèle de langage configuré
     """
@@ -40,11 +40,11 @@ def choose_llm(name: str = "") -> LLM:
     llm_configs = {
         "hosted": {
             "model": "hosted_vllm/cognitivecomputations/dolphin-2.9-llama3-8b",
-            "base_url": "https://1yq4yjjl8ydge-8000.proxy.runpod.net/v1",
+            "base_url": "https://7j88lv8yvcrcsm-8000.proxy.runpod.net/v1",
             "api_key": "token-abc123",
         },
         "local": {
-            "model": "ollama/mistral",
+            "model": "ollama/gemma2:2b",
             "base_url": "http://localhost:11434"
         },
         "mistral": {
