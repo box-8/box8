@@ -4,9 +4,11 @@ import { Modal, Button, ListGroup } from 'react-bootstrap';
 const JsonFilesModal = ({ 
   show, 
   handleClose, 
-  onFileSelect, 
+  onFileSelect,
+  onImportDiagram,
   onNewDiagram,
-  reactFlowInstance 
+  reactFlowInstance,
+  hasCurrentDiagram 
 }) => {
   const [files, setFiles] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -72,6 +74,20 @@ const JsonFilesModal = ({
     if (fileContent) {
       console.log(fileContent);
       onFileSelect(fileContent, selectedFile);
+      handleClose();
+      // Ajout du fitView après un court délai pour laisser le temps au diagramme de se charger
+      setTimeout(() => {
+        if (reactFlowInstance?.fitView) {
+          reactFlowInstance.fitView({ padding: 0.2 });
+        }
+      }, 100);
+    }
+  };
+
+  const handleImportDiagram = () => {
+    if (fileContent) {
+      console.log('Importing diagram:', fileContent);
+      onImportDiagram(fileContent, selectedFile);
       handleClose();
       // Ajout du fitView après un court délai pour laisser le temps au diagramme de se charger
       setTimeout(() => {
@@ -199,18 +215,27 @@ const JsonFilesModal = ({
             disabled={isDeleting}
             className="me-auto"
           >
-            {isDeleting ? 'Suppression...' : 'Supprimer le  diagramme'}
+            {isDeleting ? 'Suppression...' : 'Supprimer le diagramme'}
           </Button>
         )}
         <Button variant="secondary" onClick={handleClose}>
           Cancel
         </Button>
         <Button
+          variant="success"
+          onClick={handleImportDiagram}
+          disabled={!selectedFile || !hasCurrentDiagram}
+          className="me-2"
+          title={!hasCurrentDiagram ? "Vous devez d'abord charger un diagramme avant de pouvoir en importer un" : ""}
+        >
+          Importer 
+        </Button>
+        <Button
           variant="primary"
           onClick={handleLoadDiagram}
           disabled={!selectedFile}
         >
-          Charger le diagramme
+          Charger 
         </Button>
       </Modal.Footer>
     </Modal>

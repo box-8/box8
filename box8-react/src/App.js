@@ -763,6 +763,83 @@ function Flow() {
     };
   }, []);
 
+  const handleImportDiagram = useCallback((diagramData, fileName) => {
+    console.log('Importing Diagram Data:', diagramData);
+    
+    if (diagramData.nodes && diagramData.links) {
+      // Récupérer les positions maximales actuelles
+      const currentNodes = getNodes();
+      let maxX = 0;
+      let maxY = 0;
+      
+      currentNodes.forEach(node => {
+        maxX = Math.max(maxX, node.position.x);
+        maxY = Math.max(maxY, node.position.y);
+      });
+      
+      // Ajouter un décalage pour le nouveau diagramme
+      const offsetX = maxX + 400; // 400px de décalage horizontal
+      
+      // Créer les nouveaux nœuds avec un décalage
+      const importedNodes = diagramData.nodes
+        .filter(node => node.key !== 'output' && node.role !== 'output') // Exclure le nœud output du diagramme importé
+        .map(node => ({
+          id: `imported_${node.key}`,
+          type: 'agent',
+          position: {
+            x: offsetX + (node.position?.x || Math.random() * 500),
+            y: (node.position?.y || Math.random() * 500)
+          },
+          data: {
+            label: node.role,
+            name: node.name,
+            role: node.role,
+            goal: node.goal,
+            backstory: node.backstory,
+            tools: node.tools || [],
+            selected: false,
+            file: node.file
+          },
+          draggable: true,
+          connectable: true
+        }));
+      
+      // Créer les nouvelles connexions avec les IDs mis à jour
+      const importedEdges = diagramData.links
+        .map(edge => {
+          // Si la connexion va vers output, connecter au nœud output existant
+          const targetNode = edge.to === 'output' ? 'output' : `imported_${edge.to}`;
+          // Si la connexion vient de output, ignorer cette connexion
+          if (edge.from === 'output') return null;
+          
+          return {
+            id: `imported_${edge.from}-${targetNode}`,
+            source: `imported_${edge.from}`,
+            target: targetNode,
+            type: 'custom',
+            data: {
+              label: edge.description,
+              description: edge.description,
+              expected_output: edge.expected_output,
+              relationship: edge.relationship
+            }
+          };
+        })
+        .filter(edge => edge !== null); // Filtrer les connexions nulles
+
+      // Ajouter les nouveaux nœuds et connexions aux existants
+      setNodes(nds => [...nds, ...importedNodes]);
+      setEdges(eds => [...eds, ...importedEdges]);
+      
+      // Ajuster la vue pour montrer tous les nœuds
+      setTimeout(() => {
+        if (fitView) {
+          fitView({ padding: 0.2 });
+        }
+      }, 100);
+    }
+  }, [getNodes, setNodes, setEdges, fitView]);
+
   return (
     <div style={{ width: '100vw', height: '100vh', background: '#ffffff' }}>
       {!isAuthLoading && (
@@ -899,8 +976,10 @@ function Flow() {
         show={showJsonFilesModal}
         handleClose={() => setShowJsonFilesModal(false)}
         onFileSelect={handleLoadDiagram}
-        onNewDiagram={() => setShowNewDiagramModal(true)}
+        onImportDiagram={handleImportDiagram}
+        onNewDiagram={handleNewDiagram}
         reactFlowInstance={{ fitView }}
+        hasCurrentDiagram={nodes.length > 1} // On vérifie s'il y a plus d'un nœud (car le nœud output est toujours présent)
       />
 
       <LoginModal
