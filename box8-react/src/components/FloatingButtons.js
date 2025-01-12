@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Button, Form } from 'react-bootstrap';
 import 'bootstrap-icons/font/bootstrap-icons.css';
+import LoadingModal from './LoadingModal';
 
 const FloatingButtons = ({
   onAddAgent,
@@ -14,7 +15,8 @@ const FloatingButtons = ({
   hasDiagram,
   currentDiagramName,
   hasResponse,
-  isAuthenticated
+  isAuthenticated,
+  isLoading
 }) => {
   const [chatInput, setChatInput] = useState('');
 
@@ -100,7 +102,7 @@ const FloatingButtons = ({
             onClick={handleCreateCrewAI}
             title="Create CrewAI"
           >
-            <i className="bi bi-play-circle"></i>
+            <i className="bi bi-robot"></i>
           </Button>
           <div className="chat-input-container" style={{ position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '10px', backgroundColor: 'white', padding: '10px', borderRadius: '8px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
             <Form.Control
@@ -118,6 +120,7 @@ const FloatingButtons = ({
           </div>
         </>
       )}
+      <LoadingModal show={isLoading} />
     </div>
   );
 };

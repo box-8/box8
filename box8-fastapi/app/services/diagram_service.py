@@ -9,6 +9,7 @@ import networkx as nx
 
 RED = '\033[31m'
 GREEN = '\033[32m'
+YELLOW = '\033[33m'
 MAGENTA = '\033[35m'
 END = '\033[0m'
 
@@ -309,8 +310,6 @@ async def execute_process_from_diagram(data: Dict, folder: str, llm: str = "open
         agents_dict = {}
         all_results = []
         backstories = []  # Initialize backstories list
-        total_tasks = sum(1 for _ in data['links'])  # Nombre total de tâches
-        completed_tasks = 0
 
         # Initialiser les agents
         for node in data['nodes']:
@@ -372,8 +371,6 @@ async def execute_process_from_diagram(data: Dict, folder: str, llm: str = "open
                     crew = Crew(agents=[from_agent], tasks=[task])
                     
                     kickoff = await crew.kickoff_async()
-                    completed_tasks += 1
-                    
                     result = (
                         f"\n\n***\n\n"
                         f"\n\n## {task.output.agent}\n\n"
@@ -384,10 +381,14 @@ async def execute_process_from_diagram(data: Dict, folder: str, llm: str = "open
                     to_agent.backstory += f"\n\nRésultat de {from_agent.role} : {task.output.raw}"
                     all_results.append(result)
                     
+                    # print(f"RESULT : \n\n{MAGENTA}{result}{END}")
                     print(f"{MAGENTA}AGENT{END} : \n{RED}{from_agent.role}{END}")
                     print(f"{MAGENTA}KICKOFF FOR TASK DESCRIPTION{END} : \n{RED}{task.description}{END}")
                     print(f"{MAGENTA}EXPECTED OUTPUT{END} : \n{RED}{task.expected_output}{END}")
                     print(f"{MAGENTA}FROM BACKSTORY{END} : \n\n{GREEN}{from_agent.backstory}{END}")
+                    print(f"{MAGENTA}RESULT{END} : \n\n{YELLOW}{task.output.raw}{END}")
+                    
+                    # print(f"TO BACKSTORY : \n\n{GREEN}{to_agent.backstory}{END}")
 
                 except Exception as e:
                     print(f"Erreur lors de l'exécution de la tâche : {str(e)}")
@@ -402,8 +403,7 @@ async def execute_process_from_diagram(data: Dict, folder: str, llm: str = "open
             'status': 'success',
             'message': "\n".join(all_results),
             'backstories': backstories,
-            'branches_count': len(roots),
-            'progress': 100  # Ajout de la progression finale
+            'branches_count': len(roots)
         }
 
     except Exception as e:
@@ -411,6 +411,8 @@ async def execute_process_from_diagram(data: Dict, folder: str, llm: str = "open
             'status': 'error',
             'message': str(e)
         }
+
+
 
 async def ask_process_from_diagram(question: str, diagram_result: str, llm: str = "openai") -> str:
     """
