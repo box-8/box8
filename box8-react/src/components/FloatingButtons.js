@@ -102,7 +102,7 @@ const FloatingButtons = ({
             onClick={handleCreateCrewAI}
             title="Create CrewAI"
           >
-            <i className="bi bi-robot"></i>
+            <i className="bi bi-play-circle"></i>
           </Button>
           <div className="chat-input-container" style={{ position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '10px', backgroundColor: 'white', padding: '10px', borderRadius: '8px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
             <Form.Control
