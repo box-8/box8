@@ -12,7 +12,8 @@ from pydantic import BaseModel
 from typing import List, Optional
 from app.services.diagram_service import (execute_process_from_diagram, 
                                         generate_diagram_from_description,
-                                        ask_process_from_diagram)
+                                        ask_process_from_diagram,
+                                        enhance_diagram_from_description)
 import aiofiles
 from datetime import timedelta
 from app.auth.auth import create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
@@ -216,6 +217,7 @@ async def designer_launch_crewai(request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.post("/designer/generate-diagram")
 async def generate_diagram(request: Request, data: DiagramDescription):
     """Génère un diagramme à partir d'une description textuelle"""
@@ -229,6 +231,30 @@ async def generate_diagram(request: Request, data: DiagramDescription):
     
     try:
         diagram_data = await generate_diagram_from_description(data.description, data.name)
+        return JSONResponse(content=diagram_data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la génération du diagramme: {str(e)}")
+
+
+@app.post("/designer/enhance-diagram")
+async def enhance_diagram(request: Request):
+    """Génère un diagramme à partir d'une description textuelle"""
+    session = request.cookies.get("session")
+    if not session:
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    
+    user = await get_current_user(session)
+    if not user:
+        raise HTTPException(status_code=401, detail="Session invalide")
+    
+    try:
+        data = await request.json()
+        llm = request.cookies.get("selected_llm", 'openai')
+        chat_input = data.get('chatInput', '')
+
+        diagram_data = await enhance_diagram_from_description(data, chat_input, llm)
         return JSONResponse(content=diagram_data)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

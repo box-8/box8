@@ -184,7 +184,8 @@ function Flow() {
       type: 'agent',
       data: { 
         ...agentData,
-        label: agentData.role 
+        label: agentData.role,
+        summarize: agentData.summarize ?? 'Yes'
       },
       position: { 
         x: Math.random() * 500, 
@@ -198,7 +199,7 @@ function Flow() {
     setNodes((nds) => 
       nds.map((node) => 
         node.id === agentData.key 
-          ? { ...node, data: { ...agentData, label: agentData.role } }
+          ? { ...node, data: { ...agentData, label: agentData.role, summarize: agentData.summarize ?? 'Yes' } }
           : node
       )
     );
@@ -260,6 +261,12 @@ function Flow() {
     if (diagramData.nodes && diagramData.links) {
       console.log('Nodes:', diagramData.nodes);
       console.log('Links:', diagramData.links);
+      
+      // Ajouter la valeur par défaut 'Yes' pour summarize si non définie
+      diagramData.nodes = diagramData.nodes.map(node => ({
+        ...node,
+        summarize: node.summarize ?? 'Yes'
+      }));
       
       // Créer un graphe pour analyser les relations
       const graph = {};
@@ -371,6 +378,7 @@ function Flow() {
             backstory: node.backstory || 'I am responsible for collecting and formatting the final output of the process',
             tools: node.tools || [],
             selected: false,
+            summarize: node.summarize ?? 'Yes',
             ...(!isOutputNode && { file: node.file })
           },
           draggable: true,
@@ -411,16 +419,24 @@ function Flow() {
     const diagramData = {
       nodes: nodes.map(node => ({
         key: node.id,
-        ...node.data
+        type: node.type,
+        role: node.data.role,
+        goal: node.data.goal,
+        backstory: node.data.backstory,
+        tools: node.data.tools,
+        file: node.data.file,
+        summarize: node.data.summarize,
+        position: node.position
       })),
       links: edges.map(edge => ({
+        id: edge.id,
         from: edge.source,
         to: edge.target,
         description: edge.data?.description,
         expected_output: edge.data?.expected_output,
         relationship: edge.data?.relationship
       })),
-      chatInput: chatInput // Ajouter le chatInput aux données envoyées
+      chatInput: chatInput
     };
     
     var csrf = Cookies.get('csrftoken');
@@ -445,9 +461,8 @@ function Flow() {
       console.log(data);
       if (data.status === 'success') {
         setResponseMessage(data.message);
-        // Use backstories directly from the backend response
         setBackstories(data.backstories.map(b => ({
-          name: b.role,  // Use role as name
+          name: b.role,
           backstory: b.backstory
         })));
         setShowResponseModal(true);
@@ -462,7 +477,107 @@ function Flow() {
     .finally(() => {
       setIsCreatingCrewAI(false);
     });
-  }, [nodes, edges]); // Added nodes and edges as dependencies
+  }, [nodes, edges]);
+
+  const handleEnhanceDiagram = useCallback((chatInput) => {
+    setIsCreatingCrewAI(true);
+    // Récupérer les données du diagramme
+    const diagramData = {
+      nodes: nodes.map(node => ({
+        key: node.id,
+        type: node.type,
+        role: node.data.role,
+        goal: node.data.goal,
+        backstory: node.data.backstory,
+        tools: node.data.tools,
+        file: node.data.file,
+        summarize: node.data.summarize,
+        position: node.position
+      })),
+      links: edges.map(edge => ({
+        id: edge.id,
+        from: edge.source,
+        to: edge.target,
+        description: edge.data?.description,
+        expected_output: edge.data?.expected_output,
+        relationship: edge.data?.relationship
+      })),
+      chatInput: chatInput
+    };
+    
+    var csrf = Cookies.get('csrftoken');
+
+    // Envoyer la requête au serveur
+    fetch('http://localhost:8000/designer/enhance-diagram/', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrf,
+      },
+      body: JSON.stringify(diagramData)
+    })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    })
+    .then(enhancedDiagram => {
+      console.log('Enhanced diagram data:', enhancedDiagram);
+      if (enhancedDiagram.nodes && enhancedDiagram.links) {
+        // Créer les nouveaux nœuds
+        const newNodes = enhancedDiagram.nodes.map(node => {
+          const isOutputNode = node.key === 'output' || node.role === 'output';
+          return {
+            id: node.key,
+            type: isOutputNode ? 'output' : 'agent',
+            position: node.position || { x: Math.random() * 500, y: Math.random() * 500 },
+            data: {
+              label: node.role || 'Output',
+              name: node.name || 'Output',
+              role: node.role || 'output',
+              goal: node.goal || 'Collect and format the final output',
+              backstory: node.backstory || 'I am responsible for collecting and formatting the final output of the process',
+              tools: node.tools || [],
+              selected: false,
+              summarize: node.summarize ?? 'Yes',
+              ...(!isOutputNode && { file: node.file })
+            },
+            draggable: true,
+            connectable: !isOutputNode
+          };
+        });
+
+        // Créer les nouveaux liens
+        const newEdges = enhancedDiagram.links.map(edge => ({
+          id: edge.id || `${edge.from}-${edge.to}`,
+          source: edge.from,
+          target: edge.to,
+          type: 'custom',
+          data: {
+            label: edge.description,
+            description: edge.description,
+            expected_output: edge.expected_output,
+            relationship: edge.relationship
+          }
+        }));
+
+        // Mettre à jour le diagramme
+        setNodes(newNodes);
+        setEdges(newEdges);
+      } else {
+        throw new Error('Invalid diagram structure in response');
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alert('Error enhancing diagram: ' + error.message);
+    })
+    .finally(() => {
+      setIsCreatingCrewAI(false);
+    });
+  }, [nodes, edges, setNodes, setEdges]);
 
   const handleNewDiagram = useCallback(() => {
     setShowNewDiagramModal(true);
@@ -507,6 +622,7 @@ function Flow() {
         backstory: node.data.backstory,
         tools: node.data.tools,
         file: node.data.file,
+        summarize: node.data.summarize,
         position: node.position
       }));
 
@@ -798,6 +914,7 @@ function Flow() {
             backstory: node.backstory,
             tools: node.tools || [],
             selected: false,
+            summarize: node.summarize ?? 'Yes',
             file: node.file
           },
           draggable: true,
@@ -908,6 +1025,7 @@ function Flow() {
         onAddAgent={() => setShowAgentModal(true)}
         onAddTask={() => setShowTaskModal(true)}
         onCreateCrewAI={handleCreateCrewAI}
+        onEnhanceDiagram={handleEnhanceDiagram}
         onSaveDiagram={() => setShowDiagramModal(true)}
         onLoadDiagram={() => setShowJsonFilesModal(true)}
         onNewDiagram={handleNewDiagram}
@@ -915,7 +1033,7 @@ function Flow() {
         onShowResponse={() => setShowResponseModal(true)}
         hasDiagram={nodes.length > 0}
         currentDiagramName={currentDiagramName}
-        hasResponse={!!responseMessage}
+        hasResponse={responseMessage !== ''}
         isAuthenticated={isAuthenticated}
         isLoading={isCreatingCrewAI}
       />

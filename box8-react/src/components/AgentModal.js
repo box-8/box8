@@ -7,7 +7,8 @@ const AgentModal = ({ show, onHide, onAdd, onUpdate, onDelete, onSave, selectedN
     role: '',
     goal: '',
     backstory: '',
-    file: ''
+    file: '',
+    summarize: 'Yes'
   });
   const [sharePointFiles, setSharePointFiles] = useState({ files: [] });
   const [selectedFile, setSelectedFile] = useState('');
@@ -39,7 +40,8 @@ const AgentModal = ({ show, onHide, onAdd, onUpdate, onDelete, onSave, selectedN
       setFormData({
         key: selectedNode.id,
         ...selectedNode.data,
-        file: currentFile
+        file: currentFile,
+        summarize: selectedNode.data.summarize ?? 'Yes'
       });
       setSelectedFile(currentFile);
     } else {
@@ -48,7 +50,8 @@ const AgentModal = ({ show, onHide, onAdd, onUpdate, onDelete, onSave, selectedN
         role: '',
         goal: '',
         backstory: '',
-        file: ''
+        file: '',
+        summarize: 'Yes'
       });
     }
   }, [selectedNode, show]);
@@ -70,7 +73,8 @@ const AgentModal = ({ show, onHide, onAdd, onUpdate, onDelete, onSave, selectedN
       role: '',
       goal: '',
       backstory: '',
-      file: ''
+      file: '',
+      summarize: 'Yes'
     });
   };
 
@@ -85,13 +89,14 @@ const AgentModal = ({ show, onHide, onAdd, onUpdate, onDelete, onSave, selectedN
       type: selectedNode.type,
       position: selectedNode.position,
       data: {
-        ...selectedNode.data,
+        label: formData.role,
         name: formData.name,
         role: formData.role,
         goals: formData.goals,
         backstory: formData.backstory,
         allowedTools: formData.allowedTools,
-        file: selectedFile
+        file: selectedFile,
+        summarize: formData.summarize ?? 'Yes'
       }
     };
     onSave(updatedData);
@@ -153,6 +158,29 @@ const AgentModal = ({ show, onHide, onAdd, onUpdate, onDelete, onSave, selectedN
                 </option>
               ))}
             </Form.Select>
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>Résumé du fichier source</Form.Label>
+            <div className="d-flex gap-2">
+              <Button
+                variant={formData.summarize === 'No' ? 'primary' : 'outline-primary'}
+                onClick={() => setFormData({ ...formData, summarize: 'No' })}
+              >
+                Sans backstory
+              </Button>
+              <Button
+                variant={formData.summarize === 'Yes' ? 'primary' : 'outline-primary'}
+                onClick={() => setFormData({ ...formData, summarize: 'Yes' })}
+              >
+                Oui
+              </Button>
+              <Button
+                variant={formData.summarize === 'Force' ? 'primary' : 'outline-primary'}
+                onClick={() => setFormData({ ...formData, summarize: 'Force' })}
+              >
+                Forcé
+              </Button>
+            </div>
           </Form.Group>
           <div className="d-flex gap-2">
             <Button type="submit" variant="primary">

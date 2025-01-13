@@ -7,6 +7,7 @@ const FloatingButtons = ({
   onAddAgent,
   onAddTask,
   onCreateCrewAI,
+  onEnhanceDiagram,
   onSaveDiagram,
   onLoadDiagram,
   onNewDiagram,
@@ -22,6 +23,11 @@ const FloatingButtons = ({
 
   const handleCreateCrewAI = () => {
     onCreateCrewAI(chatInput);
+    setChatInput('');
+  };
+
+  const handleEnhanceDiagram = () => {
+    onEnhanceDiagram(chatInput);
     setChatInput('');
   };
 
@@ -114,8 +120,8 @@ const FloatingButtons = ({
             />
             <Button
               variant="primary"
-              onClick={handleCreateCrewAI}
-              title="Create CrewAI"
+              onClick={handleEnhanceDiagram}
+              title="Enhance Diagram"
             ><i className="bi bi-play"></i></Button>
           </div>
         </>

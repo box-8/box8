@@ -121,6 +121,50 @@ async def crewai_summarize(pdf: str, pages: int = 6, history: Optional[str] = No
 
     return result_str
 
+
+
+async def generate_diagram_check_structure(diagramData):
+    """
+    Check the structure of the diagramData and return a json
+    """
+    # Définir les tâches
+    diagram_expert = Agent(
+            role='Expert en Conception de Diagrammes',
+            goal="""Vérifier la structure d'un diagramme à partir du json qui le représente""",
+            backstory="""Vous êtes un expert dans la création de diagrammes qui représentent des workflows complexes. 
+            Vous excellez dans l'identification des agents clés, leurs rôles et les relations entre eux.""",
+            verbose=True,
+            allow_delegation=False
+        )
+    
+
+    create_diagram = Task(
+        description=f"""À partir de l'analyse du json suivant, améliorer la structure du diagramme :
+        1. en supprimant les liens formant des relations circulaires entre les nœuds du diagramme
+        2. en vérifiant qu'au moins un nœud est lié par une relationau nœud output 
+        4. en ajoutant du détail aux relations pointant vers le noeud output (tâche attendue, description, expected outpout) 
+        
+        JSON : {json.dumps(diagramData, indent=2)}
+        
+        """,
+        agent=diagram_expert,
+        expected_output="""Une chaîne JSON valide représentant la structure du diagramme avec :
+        1. Un tableau de nœuds contenant les définitions des agents
+        2. Un tableau de liens contenant les définitions des tâches/relations
+        Le JSON doit conserver exactement le format initial."""
+    )
+
+    # Créer et exécuter le crew
+    crew = Crew(
+        agents=[diagram_expert],
+        tasks=[create_diagram]
+    )
+
+    kickoff = await crew.kickoff_async()
+    result = kickoff.raw
+    return result.split("```json")[-1].split("```")[0].strip()
+
+
 async def generate_diagram_from_description(description: str, name: str = "Nouveau Diagramme") -> Dict:
     """
     Génère un diagramme à partir d'une description textuelle en utilisant CrewAI de manière asynchrone.
@@ -284,7 +328,10 @@ async def generate_diagram_from_description(description: str, name: str = "Nouve
         if "description" not in diagram_data:
             diagram_data["description"] = description
         
-        return diagram_data
+        # Vérifier la structure et parser le résultat
+        checked_json_str = await generate_diagram_check_structure(diagram_data)
+        return json.loads(checked_json_str)
+
     except Exception as e:
         print(f"Erreur : {str(e)}")
         raise ValueError(f"Échec de la génération du diagramme : {str(e)}")
@@ -313,6 +360,7 @@ async def execute_process_from_diagram(data: Dict, folder: str, llm: str = "open
 
         # Initialiser les agents
         for node in data['nodes']:
+            summarize = node.get('summarize', "Yes")
             agents_dict[node['key']] = Agent(
                 role=node.get('role', ''),
                 goal=node.get('goal', ''),
@@ -325,8 +373,19 @@ async def execute_process_from_diagram(data: Dict, folder: str, llm: str = "open
                 src = os.path.join(folder, file)
                 if os.path.exists(src):
                     agents_dict[node['key']].tools = [choose_tool(src=src)]
-                    backstory = await crewai_summarize_if_not_exists(pdf=src, llm=llm)
-                    agents_dict[node['key']].backstory += f"\n\nContexte du fichier {file} :\n{backstory}"
+
+                    if summarize=="Force":
+                        print("With backstory with force")
+                        backstory = await crewai_summarize(pdf=src, llm=llm)
+                        agents_dict[node['key']].backstory += f"\n\nContexte du fichier {file} :\n{backstory}"
+                        
+                    elif summarize=="Yes":
+                        print("With backstory without force")
+                        backstory = await crewai_summarize_if_not_exists(pdf=src, llm=llm)
+                        agents_dict[node['key']].backstory += f"\n\nContexte du fichier {file} :\n{backstory}"
+
+                    else:
+                        print("No backstory")
                 else:
                     print(f"Le fichier {file} n'existe pas.")
 
@@ -501,3 +560,151 @@ async def ask_process_from_diagram(question: str, diagram_result: str, llm: str 
         error_msg = f"Error creating CrewAI Process: {str(e)}"
         print(f"{RED}{error_msg}{END}")
         return error_msg
+
+async def enhance_diagram_from_description(diagram_data: Dict, chat_input: str, llm: str = "openai") -> Dict:
+    """
+    Modifie un diagramme existant en fonction d'une description textuelle.
+    
+    Args:
+        diagram_data (Dict): Données JSON du diagramme à modifier
+        chat_input (str): Description textuelle des modifications à apporter
+        llm (str): Modèle de langage à utiliser
+        
+    Returns:
+        Dict: Diagramme modifié
+    """
+    # Création des agents
+    diagram_analyst = Agent(
+        name="Analyste de Diagramme",
+        role="Expert en analyse de diagrammes",
+        goal="Comprendre la structure actuelle du diagramme sans la modifier",
+        backstory="""Je suis un expert en analyse de diagrammes qui comprend parfaitement la structure des données JSON.
+Je sais que le diagramme contient deux parties essentielles :
+1. nodes: liste des nœuds avec les propriétés key, type, role, goal, backstory, tools, file, summarize, position
+2. links: liste des liens avec les propriétés id, from, to, description, expected_output, relationship""",
+        llm=choose_llm(llm),
+        verbose=False
+    )
+    
+    modification_planner = Agent(
+        name="Planificateur de Modifications",
+        role="Expert en planification de modifications",
+        goal="Planifier les modifications tout en préservant la structure exacte du JSON",
+        backstory="""Je suis un expert qui traduit des descriptions textuelles en modifications concrètes de diagramme.
+Je comprends parfaitement la structure du JSON et je sais qu'il faut absolument préserver :
+- Les noms exacts des propriétés (key, type, role, etc.)
+- Le format des valeurs (chaînes de caractères, listes, objets)
+- La structure hiérarchique (nodes et links comme listes d'objets)""",
+        llm=choose_llm(llm),
+        verbose=True
+    )
+    
+    diagram_modifier = Agent(
+        name="Modificateur de Diagramme",
+        role="Expert en modification de diagrammes",
+        goal="Appliquer les modifications en conservant strictement le format JSON",
+        backstory="""Je suis un expert qui modifie les diagrammes tout en maintenant leur cohérence.
+Ma priorité absolue est de préserver la structure exacte du JSON :
+1. Pour les nœuds (nodes) :
+   - key: identifiant unique du nœud
+   - type: type du nœud (agent ou output)
+   - role: rôle du nœud
+   - goal: objectif du nœud
+   - backstory: histoire du nœud
+   - tools: liste des outils
+   - file: fichier associé (optionnel)
+   - summarize: Yes/No
+   - position: {x: number, y: number}
+
+2. Pour les liens (links) :
+   - id: identifiant unique du lien
+   - from: nœud source
+   - to: nœud destination
+   - description: description de la tâche
+   - expected_output: sortie attendue
+   - relationship: type de relation""",
+        llm=choose_llm(llm),
+        verbose=False
+    )
+
+    # Création des tâches
+    tasks = [
+        Task(
+            name="Analyse du Diagramme",
+            agent=diagram_analyst,
+            description=f"""Analyser le diagramme existant et identifier ses composants principaux.
+Input JSON Structure:
+{json.dumps(diagram_data, indent=2)}
+
+Instructions :
+1. Analyser la structure des nœuds (nodes) et leurs relations (links)
+2. Identifier les rôles et responsabilités de chaque nœud
+3. Comprendre les flux de travail existants
+4. NE PAS modifier la structure ou les noms des propriétés
+
+Format de sortie attendu : Description textuelle de l'analyse""",
+            expected_output="Une description détaillée de la structure actuelle du diagramme."
+        ),
+        Task(
+            name="Planification des Modifications",
+            agent=modification_planner,
+            description=f"""En te basant sur l'analyse du diagramme et la description suivante, planifie les modifications nécessaires.
+
+Description des modifications souhaitées :
+{chat_input}
+
+Instructions :
+1. Planifier les modifications nécessaires
+2. S'assurer que chaque modification respecte la structure JSON
+3. Vérifier que les noms des propriétés restent exacts
+4. Maintenir la cohérence des relations entre les nœuds
+5. S'assurer que le noeud output est bien conservé et correctement relié
+
+Format de sortie attendu : Liste des modifications à apporter, sans inclure le JSON modifié""",
+            expected_output="Une liste détaillée des modifications à apporter au diagramme."
+        ),
+        Task(
+            name="Application des Modifications",
+            agent=diagram_modifier,
+            description=f"""Modifier le diagramme selon le plan établi en respectant strictement le format JSON.
+
+Instructions :
+1. Appliquer les modifications planifiées en conservant le JSON EXISTANT
+2. Préserver EXACTEMENT les noms des propriétés :
+   - Pour les nodes : key, type, role, goal, backstory, tools, file, summarize, position
+   - Pour les links : id, from, to, description, expected_output, relationship
+3. Maintenir le format des valeurs (strings, arrays, objects)
+4. Conserver le noeud output et les relations qui pointent déjà vers lui
+5. Retourner le JSON modifié dans un bloc de code ```json
+
+JSON EXISTANT :
+{json.dumps(diagram_data, indent=2)}
+
+Format de sortie attendu : Le diagramme modifié au format JSON exact, encadré par ```json et ```""",
+            expected_output="Le diagramme modifié au format JSON."
+        )
+    ]
+
+    # Création et exécution du crew
+    crew = Crew(
+        agents=[diagram_analyst, modification_planner, diagram_modifier],
+        tasks=tasks,
+        process=Process.sequential
+    )
+    
+    try:
+        # Exécution du crew
+        kickoff = crew.kickoff()
+        result = kickoff.raw
+        # Extraction et validation des modifications
+        try:
+            modified_diagram = json.loads(result.split("```json")[-1].split("```")[0].strip())
+            return modified_diagram
+        except json.JSONDecodeError:
+            # Si le résultat n'est pas un JSON valide, retourner le diagramme original
+            print(f"{RED}Erreur lors de la modification du diagramme. Retour du diagramme original.{END}")
+            return diagram_data
+            
+    except Exception as e:
+        print(f"{RED}Erreur lors de l'exécution du crew: {str(e)}{END}")
+        return diagram_data
