@@ -11,7 +11,6 @@ const FloatingButtons = ({
   onSaveDiagram,
   onLoadDiagram,
   onNewDiagram,
-  onRefreshDiagram,
   onShowResponse,
   hasDiagram,
   currentDiagramName,
@@ -64,15 +63,6 @@ const FloatingButtons = ({
             title="Save Diagram"
           >
             <i className="bi bi-diagram-3"></i>
-          </Button>
-
-          <Button
-            variant="warning"
-            className="floating-button"
-            onClick={onRefreshDiagram}
-            title="Refresh Diagram"
-          >
-            <i className="bi bi-arrow-clockwise"></i>
           </Button>
 
           <Button

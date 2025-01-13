@@ -6,14 +6,16 @@ const LoadingModal = ({ show }) => {
   return (
     <Modal
       show={show}
-      centered
-      backdrop="static"
-      keyboard={false}
+      backdrop={false}
+      className="loading-modal"
       dialogClassName="loading-modal"
+      contentClassName="loading-modal"
+      animation={true}
+      onHide={() => {}}
     >
-      <Modal.Body className="text-center p-4">
+      <Modal.Body className="text-center p-3">
         <Spinner animation="border" role="status" variant="primary" />
-        <p className="mt-3 mb-0">Flux CrewAI en cours de création ...</p>
+        <p className="mt-2 mb-0">Flux CrewAI en cours...</p>
       </Modal.Body>
     </Modal>
   );
