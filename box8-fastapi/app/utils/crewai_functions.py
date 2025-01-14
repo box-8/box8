@@ -91,24 +91,37 @@ def choose_llm(name: str = "") -> LLM:
 
 def choose_tool(src: str):
     """
-    Sélectionne l'outil approprié en fonction de l'extension du fichier.
+    Sélectionne et instancie l'outil approprié en fonction de l'extension du fichier.
     
     Args:
         src (str): Chemin vers le fichier source
         
     Returns:
         Tool: Instance de l'outil approprié pour le type de fichier
+        
+    Raises:
+        ValueError: Si le fichier n'existe pas ou si l'extension n'est pas supportée
+        FileNotFoundError: Si le chemin du fichier n'existe pas
     """
-    extension = os.path.splitext(src)[1].lower()
-    tools = {
-        '.pdf': PDFSearchTool,
-        '.docx': DOCXSearchTool,
-        '.txt': TXTSearchTool,
-        '.csv': CSVSearchTool
-    }
+    # Vérifier si le fichier existe
+    if not os.path.exists(src):
+        raise FileNotFoundError(f"Le fichier n'existe pas : {src}")
     
-    tool_class = tools.get(extension)
-    if tool_class:
-        return tool_class(file_path=src)
+    # Obtenir l'extension en minuscules
+    extension = os.path.splitext(src)[1].lower()
+    
+    # Définir les correspondances entre extensions et outils
+    if extension == '.pdf':
+        return PDFSearchTool(pdf=src)
+    elif extension == '.docx':
+        return DOCXSearchTool(docx=src)
+    elif extension == '.txt':
+        return TXTSearchTool(txt=src)
+    elif extension == '.csv':
+        return CSVSearchTool(csv=src)
     else:
-        raise ValueError(f"Extension de fichier non prise en charge : {extension}")
+        supported_extensions = ['.pdf', '.docx', '.txt', '.csv']
+        raise ValueError(
+            f"Extension '{extension}' non supportée. "
+            f"Extensions supportées : {', '.join(supported_extensions)}"
+        )

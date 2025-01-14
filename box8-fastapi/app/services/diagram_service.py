@@ -372,7 +372,7 @@ async def execute_process_from_diagram(data: Dict, folder: str, llm: str = "open
             if file := node.get('file', ''):
                 src = os.path.join(folder, file)
                 if os.path.exists(src):
-                    agents_dict[node['key']].tools = [choose_tool(src=src)]
+                    # agents_dict[node['key']].tools = [choose_tool(src=src)]
 
                     if summarize=="Force":
                         print("With backstory with force")
@@ -385,7 +385,8 @@ async def execute_process_from_diagram(data: Dict, folder: str, llm: str = "open
                         agents_dict[node['key']].backstory += f"\n\nContexte du fichier {file} :\n{backstory}"
 
                     else:
-                        print("No backstory")
+                        print(f"RAG on {src}")
+                        agents_dict[node['key']].tools = [choose_tool(src=src)]
                 else:
                     print(f"Le fichier {file} n'existe pas.")
 

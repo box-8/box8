@@ -166,7 +166,7 @@ const AgentModal = ({ show, onHide, onAdd, onUpdate, onDelete, onSave, selectedN
                 variant={formData.summarize === 'No' ? 'primary' : 'outline-primary'}
                 onClick={() => setFormData({ ...formData, summarize: 'No' })}
               >
-                Sans backstory
+                RAG
               </Button>
               <Button
                 variant={formData.summarize === 'Yes' ? 'primary' : 'outline-primary'}
