@@ -1,35 +1,24 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Set
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Cookie
+from fastapi import HTTPException, status, Response, Cookie
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from uuid import uuid4
+from passlib.context import CryptContext
 
-from app.models.user import User, UserLogin, UserInDB, UserRegistration
-from app.database.database import (
-    get_user_by_email,
-    create_user,
-    check_user_exists,
-    init_db
-)
+from app.models.user import User, UserLogin, UserRegistration
+from app.database.database import get_user_by_email, create_user, check_user_exists
 
 # Configuration de la sécurité
-SECRET_KEY = "votre_clé_secrète_très_longue_et_complexe"
+SECRET_KEY = "votre_clé_secrète_ici"  # À changer en production
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-# Liste des tokens invalidés (blacklist)
-invalidated_tokens: Set[str] = set()
-
-# Configuration du hachage des mots de passe
+# Configuration du hachage de mot de passe
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Configuration du router
-router = APIRouter(
-    prefix="/auth",
-    tags=["authentication"]
-)
+# Set pour stocker les tokens invalidés
+invalidated_tokens: Set[str] = set()
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Vérifie si le mot de passe correspond au hash"""
@@ -100,6 +89,13 @@ async def get_current_user(session: Optional[str] = Cookie(None)) -> Optional[di
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Utilisateur non trouvé"
             )
+        
+        if not user["is_active"]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Compte désactivé"
+            )
+
         return user
     except JWTError:
         raise HTTPException(
@@ -107,44 +103,20 @@ async def get_current_user(session: Optional[str] = Cookie(None)) -> Optional[di
             detail="Token invalide"
         )
 
-@router.post("/register", response_model=User)
-async def register(user_data: UserRegistration):
-    """Enregistre un nouvel utilisateur"""
-    # Vérifie si l'utilisateur existe déjà
-    exists, error_message = check_user_exists(user_data.email, user_data.username)
-    if exists:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error_message
-        )
-    
-    # Crée le nouvel utilisateur
-    new_user = {
-        "id": str(uuid4()),
-        "username": user_data.username,
-        "email": user_data.email,
-        "hashed_password": get_password_hash(user_data.password),
-        "is_active": True,
-        "is_admin": False
-    }
-    
-    try:
-        create_user(new_user)
-        return User(**new_user)
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Impossible d'enregistrer l'utilisateur"
-        )
-
-@router.post("/login/")
-async def login(response: Response, user_data: UserLogin):
-    """Endpoint de login qui retourne un token JWT et crée une session"""
+async def login_user(response: Response, user_data: UserLogin):
+    """Logique de connexion d'un utilisateur"""
     user = authenticate_user(user_data.email, user_data.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email ou mot de passe incorrect"
+        )
+
+    print(f"user['is_active']: {user['is_active']}")
+    if not user["is_active"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Compte désactivé"
         )
 
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -174,48 +146,91 @@ async def login(response: Response, user_data: UserLogin):
         }
     }
 
-@router.post("/logout/")
-async def logout(response: Response, session: Optional[str] = Cookie(None)):
-    """Endpoint de déconnexion qui supprime la session"""
+async def register_user(user_data: UserRegistration):
+    """Logique d'enregistrement d'un nouvel utilisateur"""
+    print(f"Tentative d'inscription - Email: {user_data.email}, Username: {user_data.username}")
+    
+    exists, error_message = check_user_exists(user_data.email, user_data.username)
+    print(f"Résultat de la vérification - Existe: {exists}, Message: {error_message}")
+    
+    if exists:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_message
+        )
+
+    hashed_password = get_password_hash(user_data.password)
+    new_user = {
+        "id": str(uuid4()),
+        "username": user_data.username,
+        "email": user_data.email,
+        "hashed_password": hashed_password,
+        "is_active": False,  # Les nouveaux utilisateurs sont inactifs par défaut
+        "is_admin": False
+    }
+
+    try:
+        print("Tentative de création de l'utilisateur dans la base de données")
+        create_user(new_user)
+        print("Utilisateur créé avec succès")
+        return {
+            "id": new_user["id"],
+            "email": new_user["email"],
+            "username": new_user["username"],
+            "is_active": new_user["is_active"],
+            "is_admin": new_user["is_admin"]
+        }
+    except Exception as e:
+        print(f"Erreur lors de la création de l'utilisateur: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Erreur lors de la création de l'utilisateur"
+        )
+
+async def logout_user(response: Response, session: Optional[str] = Cookie(None)):
+    """Logique de déconnexion d'un utilisateur"""
     if session:
         invalidate_token(session)
     
     response.delete_cookie(
         key="session",
         httponly=True,
-        samesite="lax"
+        samesite="lax",
+        secure=False  # Mettre à True en production avec HTTPS
     )
-    return {"authenticated": False}
+    
+    return {"message": "Déconnecté avec succès"}
 
-@router.get("/check-auth/")
-async def check_auth(response: Response, session: Optional[str] = Cookie(None)):
-    """Vérifie si l'utilisateur est authentifié via le cookie de session"""
+async def check_auth_status(session: Optional[str] = Cookie(None)):
+    """Vérifie le statut d'authentification d'un utilisateur"""
     if not session:
         return {"authenticated": False}
 
-    user = await get_current_user(session)
-    if not user:
+    try:
+        user = await get_current_user(session)
+        if not user:
+            return {"authenticated": False}
+
+        return {
+            "authenticated": True,
+            "user": {
+                "id": user["id"],
+                "email": user["email"],
+                "username": user["username"],
+                "is_active": user["is_active"],
+                "is_admin": user["is_admin"]
+            }
+        }
+    except HTTPException:
         return {"authenticated": False}
 
-    return {
-        "authenticated": True,
-        "user": {
-            "id": user["id"],
-            "email": user["email"],
-            "username": user["username"],
-            "is_active": user["is_active"],
-            "is_admin": user["is_admin"]
-        }
-    }
-
-@router.get("/me/")
-async def read_users_me(response: Response, session: Optional[str] = Cookie(None)):
-    """Récupère les informations de l'utilisateur connecté"""
+async def get_current_user_info(session: Optional[str] = Cookie(None)):
+    """Récupère les informations détaillées de l'utilisateur connecté"""
     user = await get_current_user(session)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Session invalide"
+            detail="Non authentifié"
         )
 
     return {
@@ -225,6 +240,3 @@ async def read_users_me(response: Response, session: Optional[str] = Cookie(None
         "is_active": user["is_active"],
         "is_admin": user["is_admin"]
     }
-
-# Initialisation de la base de données au démarrage
-init_db()

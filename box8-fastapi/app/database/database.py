@@ -38,7 +38,8 @@ def dict_factory(cursor, row):
     for key, value in zip(fields, row):
         # Convertir explicitement les booléens
         if key in ('is_active', 'is_admin'):
-            result[key] = bool(value)
+            # Assurer que la valeur est convertie en entier puis en booléen
+            result[key] = bool(int(value)) if value is not None else False
         else:
             result[key] = value
     return result

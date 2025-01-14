@@ -1,10 +1,8 @@
 from fastapi import FastAPI, Request, HTTPException, UploadFile, File, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
-from app.routes.auth import (
-    router as auth_router,
-    get_current_user
-)
+from app.routes.auth import router as auth_router
+from app.auth.auth import get_current_user, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 from app.routes.admin import router as admin_router
 import json
 import os
@@ -17,7 +15,6 @@ from app.services.diagram_service import (execute_process_from_diagram,
                                         crewai_summarize)
 import aiofiles
 from datetime import timedelta
-from app.auth.auth import create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 from app.utils.crewai_functions import choose_llm, llm_configs
 
 MAGENTA = "\033[95m"
