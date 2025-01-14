@@ -37,6 +37,10 @@ services:
       - LOG_LEVEL=INFO
       - PROMETHEUS_MULTIPROC_DIR=/tmp
       - ENVIRONMENT=production
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     depends_on:
       - redis
     healthcheck:
