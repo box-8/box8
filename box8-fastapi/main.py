@@ -13,10 +13,18 @@ from typing import List, Optional
 from app.services.diagram_service import (execute_process_from_diagram, 
                                         generate_diagram_from_description,
                                         ask_process_from_diagram,
-                                        enhance_diagram_from_description)
+                                        enhance_diagram_from_description,
+                                        crewai_summarize)
 import aiofiles
 from datetime import timedelta
 from app.auth.auth import create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
+from app.utils.crewai_functions import choose_llm, llm_configs
+
+MAGENTA = "\033[95m"
+RED = "\033[91m"
+GREEN = "\033[92m"
+YELLOW = "\033[93m"
+END = "\033[0m"
 
 # Initialisation de l'application avec configuration des slashes
 app = FastAPI(
@@ -335,6 +343,10 @@ async def delete_user_file(request: Request, filename: str):
     
     try: 
         os.remove(file_path)
+        txt_file_path = file_path + ".txt"
+        if os.path.exists(txt_file_path):
+            os.remove(txt_file_path)
+            print(f"TXT file removed: {txt_file_path}")
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -380,6 +392,99 @@ async def set_llm(request: Request, llm_data: LLMSelection):
     response = JSONResponse(content={"message": "LLM sélectionné avec succès"})
     response.set_cookie(key="selected_llm", value=llm_data.llm)
     return response
+
+@app.get("/designer/get-llms")
+async def designer_get_llms(request: Request):
+    """Récupère la liste des configurations LLM disponibles"""
+    # Récupérer le LLM sélectionné depuis les cookies
+    current_llm = request.cookies.get("selected_llm", "openai")
+    
+    # Préparer la configuration pour le frontend
+    frontend_configs = {
+        key: {
+            "model": config["model"],
+            "label": config["model"]
+        }
+        for key, config in llm_configs.items()
+    }
+    
+    # Ajouter la valeur actuelle à la réponse
+    response_data = {
+        "configs": frontend_configs,
+        "current": current_llm
+    }
+    
+    return JSONResponse(content=response_data)
+
+
+
+@app.get("/designer/summarize_file/{filename}")
+async def summarize_file(request: Request, filename: str):
+    """Résume le contenu d'un fichier utilisateur en utilisant CrewAI"""
+    print(f"\n{MAGENTA}[SUMMARY] Starting summary for file: {filename}{END}")
+    
+    session = request.cookies.get("session")
+    if not session:
+        print(f"{RED}[SUMMARY] No session cookie found{END}")
+        raise HTTPException(status_code=401, detail="Non authentifié")
+        
+    user = await get_current_user(session)
+    if not user:
+        print(f"{RED}[SUMMARY] Authentication failed{END}")
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    
+    print(f"{GREEN}[SUMMARY] User authenticated: {user['email']}{END}")
+    user_folder = get_user_folder(user["email"])
+    file_path = os.path.join(user_folder, filename)
+    print(f"{GREEN}[SUMMARY] File path: {file_path}{END}")
+    
+    if not os.path.exists(file_path):
+        print(f"{RED}[SUMMARY] File not found: {file_path}{END}")
+        raise HTTPException(status_code=404, detail="Fichier non trouvé")
+    
+    try:
+        print(f"{YELLOW}[SUMMARY] Starting CrewAI summarization with LLM: {request.cookies.get('selected_llm', 'openai')}{END}")
+        summary = await crewai_summarize(file_path, pages=6, llm=request.cookies.get("selected_llm", 'openai'))
+        print(f"{GREEN}[SUMMARY] Summary generated successfully{END}")
+        return {"summary": summary}
+    except Exception as e:
+        print(f"{RED}[SUMMARY] Error during summarization: {str(e)}{END}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/designer/get_summary_file/{filename}")
+async def get_summary_file(request: Request, filename: str):
+    """Récupère le contenu du fichier de résumé associé à un fichier"""
+    print(f"\n{MAGENTA}[GET SUMMARY] Getting summary for file: {filename}{END}")
+    
+    session = request.cookies.get("session")
+    if not session:
+        print(f"{RED}[GET SUMMARY] No session cookie found{END}")
+        raise HTTPException(status_code=401, detail="Non authentifié")
+        
+    user = await get_current_user(session)
+    if not user:
+        print(f"{RED}[GET SUMMARY] Authentication failed{END}")
+        raise HTTPException(status_code=401, detail="Non authentifié")
+    
+    print(f"{GREEN}[GET SUMMARY] User authenticated: {user['email']}{END}")
+    user_folder = get_user_folder(user["email"])
+    file_path = os.path.join(user_folder, filename)
+    summary_path = f"{file_path}.txt"
+    
+    print(f"{GREEN}[GET SUMMARY] Summary path: {summary_path}{END}")
+    
+    if not os.path.exists(summary_path):
+        print(f"{RED}[GET SUMMARY] Summary file not found: {summary_path}{END}")
+        return {"has_summary": False, "summary": None}
+    
+    try:
+        async with aiofiles.open(summary_path, 'r', encoding='utf-8') as file:
+            content = await file.read()
+            print(f"{GREEN}[GET SUMMARY] Summary file read successfully{END}")
+            return {"has_summary": True, "summary": content}
+    except Exception as e:
+        print(f"{RED}[GET SUMMARY] Error reading summary file: {str(e)}{END}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Route de test
 @app.get("/")

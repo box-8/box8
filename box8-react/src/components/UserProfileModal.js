@@ -9,20 +9,22 @@ import Tab from 'react-bootstrap/Tab';
 import Table from 'react-bootstrap/Table';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 
-const UserProfileModal = ({ show, onHide, user, onLogout }) => {
+const UserProfileModal = ({ show, onHide, user, onLogout, onLLMChange }) => {
   const [files, setFiles] = useState([]);
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
   const [selectedLLM, setSelectedLLM] = useState('openai');
+  const [llmConfigs, setLLMConfigs] = useState({});
   const [users, setUsers] = useState([]);
+  const [summarizingFiles, setSummarizingFiles] = useState(new Set());
   const fileInputRef = useRef();
 
   const getFileUrl = (fileName) => {
     return `http://localhost:8000/designer/get_user_file/${encodeURIComponent(fileName)}`;
   };
 
-  const saveLLMSelection = async (newLLM) => {
+  const handleLLMChange = async (llm) => {
     try {
       const response = await fetch('http://localhost:8000/designer/set-llm', {
         method: 'POST',
@@ -30,37 +32,56 @@ const UserProfileModal = ({ show, onHide, user, onLogout }) => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ llm: newLLM }),
+        body: JSON.stringify({ llm }),
       });
-      
-      if (!response.ok) {
-        throw new Error('Erreur lors de la sauvegarde du LLM');
-      }
-    } catch (err) {
-      console.error('Erreur:', err);
-      setError('Erreur lors de la sauvegarde des paramètres LLM');
-    }
-  };
 
-  const handleLLMChange = (newLLM) => {
-    setSelectedLLM(newLLM);
-    saveLLMSelection(newLLM);
+      if (response.ok) {
+        setSelectedLLM(llm);
+        onLLMChange(llm); // Mettre à jour le LLM dans App.js
+      }
+    } catch (error) {
+      console.error('Error setting LLM:', error);
+    }
   };
 
   useEffect(() => {
     if (show) {
       loadUserFiles();
+      const fetchLLMConfigs = async () => {
+        try {
+          const response = await fetch('http://localhost:8000/designer/get-llms', {
+            credentials: 'include' // Important pour recevoir les cookies
+          });
+          const data = await response.json();
+          setLLMConfigs(data.configs);
+          setSelectedLLM(data.current); // Utiliser la valeur du cookie
+        } catch (error) {
+          console.error('Error fetching LLM configs:', error);
+        }
+      };
+      fetchLLMConfigs();
     }
   }, [show]);
 
   const loadUserFiles = async () => {
     try {
-      const response = await fetch('http://localhost:8000/designer/get_user_files/', {
+      const response = await fetch('http://localhost:8000/designer/get_user_files', {
         credentials: 'include'
       });
       if (response.ok) {
         const data = await response.json();
-        setFiles(data);
+        // Vérifier les résumés existants pour chaque fichier
+        const filesWithSummaryStatus = await Promise.all(data.map(async (file) => {
+          const summaryResponse = await fetch(`http://localhost:8000/designer/get_summary_file/${encodeURIComponent(file.name)}`, {
+            credentials: 'include'
+          });
+          if (summaryResponse.ok) {
+            const summaryData = await summaryResponse.json();
+            return { ...file, has_summary: summaryData.has_summary };
+          }
+          return { ...file, has_summary: false };
+        }));
+        setFiles(filesWithSummaryStatus);
       } else {
         setError('Erreur lors du chargement des fichiers');
       }
@@ -227,6 +248,68 @@ const UserProfileModal = ({ show, onHide, user, onLogout }) => {
     }
   };
 
+  const handleSummarize = async (fileName) => {
+    setSummarizingFiles(prev => new Set([...prev, fileName]));
+    setError('');
+    try {
+      const response = await fetch(`http://localhost:8000/designer/summarize_file/${encodeURIComponent(fileName)}`, {
+        method: 'GET',
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        // Afficher le résumé dans ResponseModal via App.js
+        const event = new CustomEvent('showResponse', { 
+          detail: { 
+            title: `Résumé de ${fileName}`,
+            content: data.summary 
+          }
+        });
+        window.dispatchEvent(event);
+        // Recharger la liste des fichiers pour mettre à jour les statuts des résumés
+        await loadUserFiles();
+      } else {
+        setError('Erreur lors de la génération du résumé');
+      }
+    } catch (err) {
+      setError('Erreur de connexion au serveur');
+    } finally {
+      setSummarizingFiles(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(fileName);
+        return newSet;
+      });
+    }
+  };
+
+  const handleViewSummary = async (fileName) => {
+    try {
+      const response = await fetch(`http://localhost:8000/designer/get_summary_file/${encodeURIComponent(fileName)}`, {
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.has_summary) {
+          const event = new CustomEvent('showResponse', { 
+            detail: { 
+              title: `Résumé existant de ${fileName}`,
+              content: data.summary 
+            }
+          });
+          window.dispatchEvent(event);
+        } else {
+          setError('Aucun résumé disponible pour ce fichier');
+        }
+      } else {
+        setError('Erreur lors de la récupération du résumé');
+      }
+    } catch (err) {
+      setError('Erreur de connexion au serveur');
+    }
+  };
+
   return (
     <Modal show={show} onHide={onHide} size="lg">
       <Modal.Header closeButton>
@@ -296,13 +379,45 @@ const UserProfileModal = ({ show, onHide, user, onLogout }) => {
                         {formatFileSize(file.size)} • Modifié le {formatDate(file.modified)}
                       </small>
                     </div>
-                    <Button
-                      variant="outline-danger"
-                      size="sm"
-                      onClick={() => handleDeleteFile(file.name)}
-                    >
-                      <i className="bi bi-trash"></i>
-                    </Button>
+                    <div>
+                      <Button
+                        variant="outline-primary"
+                        size="sm"
+                        className="me-2"
+                        onClick={() => handleSummarize(file.name)}
+                        disabled={summarizingFiles.has(file.name)}
+                      >
+                        {summarizingFiles.has(file.name) ? (
+                          <>
+                            <i className="bi bi-hourglass-split me-1"></i>
+                            Résumé en cours...
+                          </>
+                        ) : (
+                          <>
+                            <i className="bi bi-file-text me-1"></i>
+                            Résumer
+                          </>
+                        )}
+                      </Button>
+                      {file.has_summary && (
+                        <Button
+                          variant="outline-success"
+                          size="sm"
+                          className="me-2"
+                          onClick={() => handleViewSummary(file.name)}
+                        >
+                          <i className="bi bi-eye me-1"></i>
+                          Voir résumé
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline-danger"
+                        size="sm"
+                        onClick={() => handleDeleteFile(file.name)}
+                      >
+                        <i className="bi bi-trash"></i>
+                      </Button>
+                    </div>
                   </ListGroup.Item>
                 ))}
                 {files.length === 0 && (
@@ -320,70 +435,17 @@ const UserProfileModal = ({ show, onHide, user, onLogout }) => {
               <h4>Configuration LLM</h4>
               <Form>
                 <Form.Group>
-                  <Form.Check
-                    type="radio"
-                    id="llm-hosted"
-                    name="llm"
-                    label="hosted_vllm/cognitivecomputations/dolphin-2.9-llama3-8b"
-                    checked={selectedLLM === 'hosted'}
-                    onChange={() => handleLLMChange('hosted')}
-                  />
-                  <Form.Check
-                    type="radio"
-                    id="llm-openai"
-                    name="llm"
-                    label="OpenAI GPT-4"
-                    checked={selectedLLM === 'openai'}
-                    onChange={() => handleLLMChange('openai')}
-                  />
-                  <Form.Check
-                    type="radio"
-                    id="llm-other"
-                    name="llm"
-                    label="OpenAI GPT-3.5"
-                    checked={selectedLLM === 'other'}
-                    onChange={() => handleLLMChange('other')}
-                  />
-                  <Form.Check
-                    type="radio"
-                    id="llm-groq-llama"
-                    name="llm"
-                    label="groq/llama-3.1-70b-versatile"
-                    checked={selectedLLM === 'groq-llama'}
-                    onChange={() => handleLLMChange('groq-llama')}
-                  />
-                  <Form.Check
-                    type="radio"
-                    id="llm-groq"
-                    name="llm"
-                    label="groq/mixtral-8x7b-32768"
-                    checked={selectedLLM === 'groq'}
-                    onChange={() => handleLLMChange('groq')}
-                  />
-                  <Form.Check
-                    type="radio"
-                    id="llm-groq-llama3"
-                    name="llm"
-                    label="groq/llama3-8b-8192"
-                    checked={selectedLLM === 'groq-llama3'}
-                    onChange={() => handleLLMChange('groq-llama3')}
-                  />
-                  <Form.Check
-                    type="radio"
-                    id="llm-mistral"
-                    name="llm"
-                    label="Mistral"
-                    checked={selectedLLM === 'mistral'}
-                    onChange={() => handleLLMChange('mistral')}
-                  />
-                  <Form.Check
-                    type="radio"
-                    id="local"
-                    name="llm"
-                    label="ollama/mistral"
-                    checked={selectedLLM === 'local'}
-                    onChange={() => handleLLMChange('local')}
-                  />
+                  {Object.entries(llmConfigs).map(([key, config]) => (
+                    <Form.Check
+                      key={key}
+                      type="radio"
+                      id={`llm-${key}`}
+                      name="llm"
+                      label={config.label}
+                      checked={selectedLLM === key}
+                      onChange={() => handleLLMChange(key)}
+                    />
+                  ))}
                 </Form.Group>
               </Form>
             </div>

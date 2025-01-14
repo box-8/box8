@@ -4,7 +4,7 @@ import { marked } from 'marked';
 import { downloadAsWord } from '../utils/documentUtils';
 import '../styles/markdown.css';
 
-const ResponseModal = ({ show, handleClose, message, backstories = [], diagramName = 'response' }) => {
+const ResponseModal = ({ show, handleClose, message, title, backstories = [], diagramName = 'response' }) => {
   const [htmlContent, setHtmlContent] = useState('');
   const [showBackstories, setShowBackstories] = useState(false);
 
@@ -146,7 +146,7 @@ const ResponseModal = ({ show, handleClose, message, backstories = [], diagramNa
       dialogClassName="modal-90w"
     >
       <Modal.Header closeButton>
-        <Modal.Title>CrewAI Process Response</Modal.Title>
+        <Modal.Title>{title || 'Réponse'}</Modal.Title>
       </Modal.Header>
       <Modal.Body>
         <div 

@@ -51,9 +51,11 @@ function Flow() {
   const [user, setUser] = useState(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [responseMessage, setResponseMessage] = useState('');
+  const [responseTitle, setResponseTitle] = useState('');
   const [backstories, setBackstories] = useState([]);
   const [currentDiagramName, setCurrentDiagramName] = useState('');
   const [currentDiagramDescription, setCurrentDiagramDescription] = useState('');
+  const [currentLLM, setCurrentLLM] = useState('openai');
   const [isCreatingCrewAI, setIsCreatingCrewAI] = useState(false);
   const { fitView, getNodes, getEdges } = useReactFlow();
 
@@ -374,8 +376,8 @@ function Flow() {
             label: node.role || 'Output',
             name: node.name || 'Output',
             role: node.role || 'output',
-            goal: node.goal || 'Collect and format the final output',
-            backstory: node.backstory || 'I am responsible for collecting and formatting the final output of the process',
+            goal: node.goal || 'Collecte et formate la sortie finale',
+            backstory: node.backstory || 'Je suis responsable de collecter et de formater la sortie finale du processus',
             tools: node.tools || [],
             selected: false,
             summarize: node.summarize ?? 'Yes',
@@ -537,8 +539,8 @@ function Flow() {
               label: node.role || 'Output',
               name: node.name || 'Output',
               role: node.role || 'output',
-              goal: node.goal || 'Collect and format the final output',
-              backstory: node.backstory || 'I am responsible for collecting and formatting the final output of the process',
+              goal: node.goal || 'Collecte et formate la sortie finale',
+              backstory: node.backstory || 'Je suis responsable de collecter et de formater la sortie finale du processus',
               tools: node.tools || [],
               selected: false,
               summarize: node.summarize ?? 'Yes',
@@ -592,8 +594,8 @@ function Flow() {
         label: 'Output',
         name: 'Output',
         role: 'output',
-        goal: 'Collect and format the final output',
-        backstory: 'I am responsible for collecting and formatting the final output of the process',
+        goal: 'Collecte et formate la sortie finale',
+        backstory: 'Je suis responsable de collecter et de formater la sortie finale du processus',
         tools: [],
         selected: false
       },
@@ -792,54 +794,10 @@ function Flow() {
     }
   }, [nodes, fitView]);
 
-  // Vérification périodique de la session
-  useEffect(() => {
-    let sessionCheckTimeout;
-    
-    const checkSession = async () => {
-      if (isAuthenticated) {
-        try {
-          const response = await fetch('http://localhost:8000/auth/check-auth/', {
-            credentials: 'include',
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-            },
-          });
-          
-          if (!response.ok) {
-            console.log('Session invalide, déconnexion automatique');
-            await handleLogout();
-            return;
-          }
-          
-          const data = await response.json();
-          if (!data.authenticated) {
-            console.log('Session expirée, déconnexion automatique');
-            await handleLogout();
-          } else {
-            // Programmer la prochaine vérification
-            sessionCheckTimeout = setTimeout(checkSession, 5 * 60 * 1000); // Vérifier toutes les 5 minutes
-          }
-        } catch (error) {
-          console.error('Erreur lors de la vérification de la session:', error);
-          // En cas d'erreur réseau, on ne déconnecte pas l'utilisateur
-          sessionCheckTimeout = setTimeout(checkSession, 60 * 1000); // Réessayer dans 1 minute en cas d'erreur
-        }
-      }
-    };
-
-    // Démarrer la vérification
-    if (isAuthenticated) {
-      sessionCheckTimeout = setTimeout(checkSession, 5 * 60 * 1000); // Première vérification après 5 minutes
-    }
-
-    return () => {
-      if (sessionCheckTimeout) {
-        clearTimeout(sessionCheckTimeout);
-      }
-    };
-  }, [isAuthenticated]);
+  // Fonction pour mettre à jour le LLM courant
+  const updateCurrentLLM = (llm) => {
+    setCurrentLLM(llm);
+  };
 
   // Intercepteur global pour les réponses 401
   useEffect(() => {
@@ -877,6 +835,23 @@ function Flow() {
     return () => {
       window.fetch = originalFetch;
     };
+  }, []);
+
+  // Charger le LLM actuel au démarrage
+  useEffect(() => {
+    const fetchCurrentLLM = async () => {
+      try {
+        const response = await fetch('http://localhost:8000/designer/get-llms', {
+          credentials: 'include'
+        });
+        const data = await response.json();
+        updateCurrentLLM(data.current);
+      } catch (error) {
+        console.error('Error fetching current LLM:', error);
+      }
+    };
+
+    fetchCurrentLLM();
   }, []);
 
   const handleImportDiagram = useCallback((diagramData, fileName) => {
@@ -957,6 +932,19 @@ function Flow() {
     }
   }, [getNodes, setNodes, setEdges, fitView]);
 
+  // Écouteur pour l'événement showResponse
+  useEffect(() => {
+    const handleShowResponse = (event) => {
+      console.log('Received showResponse event:', event.detail);
+      setResponseTitle(event.detail.title);
+      setResponseMessage(event.detail.content);
+      setShowResponseModal(true);
+    };
+
+    window.addEventListener('showResponse', handleShowResponse);
+    return () => window.removeEventListener('showResponse', handleShowResponse);
+  }, []);
+
   return (
     <div style={{ width: '100vw', height: '100vh', background: '#ffffff' }}>
       {!isAuthLoading && (
@@ -998,7 +986,7 @@ function Flow() {
           borderRadius: '4px',
           boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
         }}>
-          {currentDiagramName}
+          {currentDiagramName} ({currentLLM})
         </div>
       )}
       <ReactFlow
@@ -1086,6 +1074,7 @@ function Flow() {
         show={showResponseModal}
         handleClose={() => setShowResponseModal(false)}
         message={responseMessage}
+        title={responseTitle}
         backstories={backstories}
         diagramName={currentDiagramName}
       />
@@ -1111,6 +1100,7 @@ function Flow() {
         onHide={() => setShowProfileModal(false)}
         user={user}
         onLogout={handleLogout}
+        onLLMChange={updateCurrentLLM}
       />
     </div>
   );

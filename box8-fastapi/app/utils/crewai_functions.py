@@ -1,11 +1,56 @@
 import os
-from crewai import LLM
+from crewai import LLM, Agent, Task, Crew
 from crewai_tools import (PDFSearchTool,
                          DOCXSearchTool,
                          TXTSearchTool,
                          CSVSearchTool)
 import chromadb
 from chromadb.config import Settings
+
+# Configuration globale des LLMs
+llm_configs = {
+    "hosted": {
+        "model": "hosted_vllm/cognitivecomputations/dolphin-2.9-llama3-8b",
+        "base_url": "https://7j88lv8yvcrcsm-8000.proxy.runpod.net/v1",
+        "api_key": "token-abc123"
+    },
+    "local": {
+        "model": "ollama/gemma2:2b",
+        "base_url": "http://localhost:11434"
+    },
+    "mistral": {
+        "model": "mistral/mistral-medium-latest",
+        "temperature": 0.2
+    },
+    "mistral-8x7b": {
+        "model": "mistral/open-mixtral-8x7b",
+        "temperature": 0.2
+    },
+    "mistral-8x22b": {
+        "model": "mistral/open-mixtral-8x22b",
+        "temperature": 0.2
+    },
+    "groq": {
+        "model": "groq/mixtral-8x7b-32768",
+        "temperature": 0.2
+    },
+    "groq-llama": {
+        "model": "groq/llama-3.1-70b-versatile",
+        "temperature": 0.2
+    },
+    "groq-llama3": {
+        "model": "groq/llama3-8b-8192",
+        "temperature": 0.2
+    },
+    "openai": {
+        "model": "gpt-4",
+        "temperature": 0.2
+    },
+    "claude": {
+        "model": "claude-3-5-sonnet-20240620",
+        "temperature": 0.2
+    }
+}
 
 def reset_chroma() -> bool:
     """
@@ -36,42 +81,6 @@ def choose_llm(name: str = "") -> LLM:
     """
     if name == "":
         name = "openai"
-
-    llm_configs = {
-        "hosted": {
-            "model": "hosted_vllm/cognitivecomputations/dolphin-2.9-llama3-8b",
-            "base_url": "https://7j88lv8yvcrcsm-8000.proxy.runpod.net/v1",
-            "api_key": "token-abc123",
-        },
-        "local": {
-            "model": "ollama/gemma2:2b",
-            "base_url": "http://localhost:11434"
-        },
-        "mistral": {
-            "model": "mistral/mistral-medium-latest",
-            "temperature": 0.2
-        },
-        "groq": {
-            "model": "groq/mixtral-8x7b-32768",
-            "temperature": 0.2
-        },
-        "groq-llama": {
-            "model": "groq/llama-3.1-70b-versatile",
-            "temperature": 0.2
-        },
-        "groq-llama3": {
-            "model": "groq/llama3-8b-8192",
-            "temperature": 0.2
-        },
-        "openai": {
-            "model": "gpt-4",
-            "temperature": 0.2
-        },
-        "claude": {
-            "model": "claude-3-5-sonnet-20240620",
-            "temperature": 0.2
-        }
-    }
 
     config = llm_configs.get(name, llm_configs["openai"])
     return LLM(**config)

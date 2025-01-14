@@ -88,19 +88,19 @@ async def crewai_summarize(pdf: str, pages: int = 6, history: Optional[str] = No
             name="Extraction du Titre",
             agent=agents["title_extractor"],
             description=f"À partir du texte suivant, identifie le titre du document :\n{content}",
-            expected_output="Le titre du document."
+            expected_output="Le titre du document en français."
         ),
         Task(
             name="Identification de l'Auteur et du Public Cible",
             agent=agents["author_audience_extractor"],
             description=f"En te basant sur le texte suivant, détermine qui a écrit le document et à quel public il s'adresse :\n{content}",
-            expected_output="L'auteur du document et le public cible."
+            expected_output="L'auteur du document et le public cible en français."
         ),
         Task(
             name="Analyse du Sujet et de l'Objectif",
             agent=agents["subject_purpose_extractor"],
             description=f"Analyse le texte suivant pour déterminer le sujet du document et son objectif :\n{content}",
-            expected_output="Le sujet et l'objectif du document avec un titre des sous-titres les informations clés (chiffres conclusions) et structuré au format markdown."
+            expected_output="Le sujet et l'objectif du document en français avec un titre des sous-titres les informations clés (chiffres conclusions) et structuré au format markdown."
         )
     ]
 
@@ -302,8 +302,8 @@ async def generate_diagram_from_description(description: str, name: str = "Nouve
                 "key": "output",
                 "type": "output",
                 "role": "Output",
-                "goal": "Collect and format the final output",
-                "backstory": "I am responsible for collecting and formatting the final output of the process",
+                "goal": "Collecte et formate la sortie finale",
+                "backstory": "Je suis responsable de collecter et de formater la sortie finale du processus",
                 "file": ""
             }
             diagram_data["nodes"].append(output_node)
