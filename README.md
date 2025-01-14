@@ -7,34 +7,64 @@ Box8 est une application de conception et d'exécution de workflows basée sur u
 ## Fonctionnalités Principales
 
 ### Frontend (React)
-- Interface de conception de diagrammes avec React Flow
-- Création et édition de nœuds d'agents et de connexions
-- Gestion des diagrammes (création, sauvegarde, chargement)
-- Interface utilisateur avec modales pour :
-  - Gestion des agents
-  - Gestion des tâches
-  - Gestion des diagrammes
-  - Gestion des fichiers JSON
-  - Authentification utilisateur
-  - Profil utilisateur
-- Visualisation des réponses et résultats en temps réel
-- Support multi-langues (FR/EN)
-- Mode sombre/clair
-- Responsive design
+- Interface de conception avancée avec React Flow 11
+- Éditeur intelligent avec :
+  - Suggestions contextuelles
+  - Auto-complétion des propriétés
+  - Validation en temps réel
+  - Templates personnalisables
+  - Historique des modifications
+  - Collaboration temps réel
+- Visualisation avancée :
+  - Modes de vue multiples
+  - Statistiques d'exécution
+  - Graphiques de performance
+  - Timeline des événements
+  - Export de rapports
+- Intégrations :
+  - Partage via SharePoint
+  - Export multi-formats
+  - Intégration outils externes
+  - API WebSocket temps réel
+  - SSO et OAuth2
+- Performance optimisée :
+  - Code splitting par routes
+  - Prefetching intelligent
+  - Cache optimisé
+  - Support offline
+  - Compression des assets
+- Interface utilisateur moderne :
+  - Mode sombre/clair
+  - Support multi-langues (FR/EN)
+  - Design responsive
+  - Raccourcis clavier
+  - Tour guidé interactif
 
 ### Backend (FastAPI)
-- API RESTful sécurisée avec authentification JWT
-- Gestion des diagrammes :
-  - Listage des diagrammes disponibles
-  - Récupération des diagrammes
-  - Sauvegarde des diagrammes
-  - Suppression des diagrammes
-- Exécution des workflows avec CrewAI
-- Gestion des fichiers utilisateurs
-- Génération de diagrammes à partir de descriptions textuelles
-- Support CORS pour l'intégration avec le frontend
-- Cache Redis pour les performances
-- Logging avancé
+- API RESTful sécurisée avec JWT
+- Services spécialisés :
+  - CrewAI Service :
+    - Gestion des agents et workflows
+    - Exécution parallèle
+    - Monitoring performances
+    - Gestion erreurs et reprises
+  - Diagram Service :
+    - Génération via LLM
+    - Validation structures
+    - Optimisation layouts
+    - Export multi-formats
+    - Versioning
+  - Cache Service :
+    - Redis optimisé
+    - Invalidation intelligente
+    - Compression données
+    - Métriques performance
+- Monitoring avancé :
+  - Métriques Prometheus/Grafana
+  - Logs structurés JSON
+  - Alerting configurable
+  - Traçabilité requêtes
+  - Métriques personnalisées
 
 ## Structure du Projet
 
