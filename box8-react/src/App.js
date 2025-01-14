@@ -187,7 +187,8 @@ function Flow() {
       data: { 
         ...agentData,
         label: agentData.role,
-        summarize: agentData.summarize ?? 'Yes'
+        summarize: agentData.summarize ?? 'Yes',
+        rag: agentData.rag ?? 'No'
       },
       position: { 
         x: Math.random() * 500, 
@@ -201,7 +202,7 @@ function Flow() {
     setNodes((nds) => 
       nds.map((node) => 
         node.id === agentData.key 
-          ? { ...node, data: { ...agentData, label: agentData.role, summarize: agentData.summarize ?? 'Yes' } }
+          ? { ...node, data: { ...agentData, label: agentData.role, summarize: agentData.summarize ?? 'Yes', rag: agentData.rag ?? 'No' } }
           : node
       )
     );
@@ -264,10 +265,11 @@ function Flow() {
       console.log('Nodes:', diagramData.nodes);
       console.log('Links:', diagramData.links);
       
-      // Ajouter la valeur par défaut 'Yes' pour summarize si non définie
+      // Ajouter la valeur par défaut pour summarize et rag si non définie
       diagramData.nodes = diagramData.nodes.map(node => ({
         ...node,
-        summarize: node.summarize ?? 'Yes'
+        summarize: node.summarize ?? 'Yes',
+        rag: node.rag ?? 'No'
       }));
       
       // Créer un graphe pour analyser les relations
@@ -381,6 +383,7 @@ function Flow() {
             tools: node.tools || [],
             selected: false,
             summarize: node.summarize ?? 'Yes',
+            rag: node.rag ?? 'No',
             ...(!isOutputNode && { file: node.file })
           },
           draggable: true,
@@ -428,6 +431,7 @@ function Flow() {
         tools: node.data.tools,
         file: node.data.file,
         summarize: node.data.summarize,
+        rag: node.data.rag,
         position: node.position
       })),
       links: edges.map(edge => ({
@@ -494,6 +498,7 @@ function Flow() {
         tools: node.data.tools,
         file: node.data.file,
         summarize: node.data.summarize,
+        rag: node.data.rag,
         position: node.position
       })),
       links: edges.map(edge => ({
@@ -544,6 +549,7 @@ function Flow() {
               tools: node.tools || [],
               selected: false,
               summarize: node.summarize ?? 'Yes',
+              rag: node.rag ?? 'No',
               ...(!isOutputNode && { file: node.file })
             },
             draggable: true,
@@ -625,6 +631,7 @@ function Flow() {
         tools: node.data.tools,
         file: node.data.file,
         summarize: node.data.summarize,
+        rag: node.data.rag,
         position: node.position
       }));
 
@@ -890,6 +897,7 @@ function Flow() {
             tools: node.tools || [],
             selected: false,
             summarize: node.summarize ?? 'Yes',
+            rag: node.rag ?? 'No',
             file: node.file
           },
           draggable: true,

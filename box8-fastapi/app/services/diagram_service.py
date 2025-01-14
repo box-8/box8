@@ -357,10 +357,12 @@ async def execute_process_from_diagram(data: Dict, folder: str, llm: str = "open
         agents_dict = {}
         all_results = []
         backstories = []  # Initialize backstories list
+        agent_results = {}  # Dictionnaire pour stocker les résultats par agent
 
         # Initialiser les agents
         for node in data['nodes']:
             summarize = node.get('summarize', "Yes")
+            rag = node.get('rag', "No")
             agents_dict[node['key']] = Agent(
                 role=node.get('role', ''),
                 goal=node.get('goal', ''),
@@ -372,7 +374,11 @@ async def execute_process_from_diagram(data: Dict, folder: str, llm: str = "open
             if file := node.get('file', ''):
                 src = os.path.join(folder, file)
                 if os.path.exists(src):
-                    # agents_dict[node['key']].tools = [choose_tool(src=src)]
+                    if rag=="Yes": 
+                        print(f"RAG on {src}")
+                        agents_dict[node['key']].tools = [choose_tool(src=src)]
+                        agents_dict[node['key']].verbose = True
+                        summarize = "No"
 
                     if summarize=="Force":
                         print("With backstory with force")
@@ -380,13 +386,13 @@ async def execute_process_from_diagram(data: Dict, folder: str, llm: str = "open
                         agents_dict[node['key']].backstory += f"\n\nContexte du fichier {file} :\n{backstory}"
                         
                     elif summarize=="Yes":
-                        print("With backstory without force")
+                        print("With backstory without forcing sumup")
                         backstory = await crewai_summarize_if_not_exists(pdf=src, llm=llm)
                         agents_dict[node['key']].backstory += f"\n\nContexte du fichier {file} :\n{backstory}"
 
                     else:
-                        print(f"RAG on {src}")
-                        agents_dict[node['key']].tools = [choose_tool(src=src)]
+                        print(f"No summary is used on {src}")
+                        # agents_dict[node['key']].tools = [choose_tool(src=src)]
                 else:
                     print(f"Le fichier {file} n'existe pas.")
 
@@ -428,27 +434,40 @@ async def execute_process_from_diagram(data: Dict, folder: str, llm: str = "open
                 )
 
                 try:
-                    crew = Crew(agents=[from_agent], tasks=[task])
-                    
-                    kickoff = await crew.kickoff_async()
-                    result = (
-                        f"\n\n***\n\n"
-                        f"\n\n## {task.output.agent}\n\n"
-                        f"\n\n### {task.output.description}\n\n"
-                        f"\n\n{task.output.raw}\n\n"
-                    )
-                    
-                    to_agent.backstory += f"\n\nRésultat de {from_agent.role} : {task.output.raw}"
-                    all_results.append(result)
-                    
-                    # print(f"RESULT : \n\n{MAGENTA}{result}{END}")
-                    print(f"{MAGENTA}AGENT{END} : \n{RED}{from_agent.role}{END}")
-                    print(f"{MAGENTA}KICKOFF FOR TASK DESCRIPTION{END} : \n{RED}{task.description}{END}")
-                    print(f"{MAGENTA}EXPECTED OUTPUT{END} : \n{RED}{task.expected_output}{END}")
-                    print(f"{MAGENTA}FROM BACKSTORY{END} : \n\n{GREEN}{from_agent.backstory}{END}")
-                    print(f"{MAGENTA}RESULT{END} : \n\n{YELLOW}{task.output.raw}{END}")
-                    
-                    # print(f"TO BACKSTORY : \n\n{GREEN}{to_agent.backstory}{END}")
+                    # Vérifier si l'agent a déjà produit un résultat
+                    if from_key in agent_results:
+                        # Réutiliser le résultat existant
+                        result = agent_results[from_key]
+                        to_agent.backstory += f"\n\nRésultat de {from_agent.role} : {result}"
+                        print(f"{MAGENTA}AGENT{END} : \n{RED}{from_agent.role}{END}")
+                        print(f"{MAGENTA}REUSING PREVIOUS RESULT FOR TASK{END} : \n{RED}{task.description}{END}")
+                    else:
+                        # Exécuter la tâche normalement
+                        crew = Crew(agents=[from_agent], tasks=[task])
+                        kickoff = await crew.kickoff_async()
+                        result = task.output.raw
+                        
+                        # Stocker le résultat pour cet agent
+                        agent_results[from_key] = result
+                        
+                        formatted_result = (
+                            f"\n\n***\n\n"
+                            f"\n\n## {task.output.agent}\n\n"
+                            f"\n\n### {task.output.description}\n\n"
+                            f"\n\n{result}\n\n"
+                        )
+                        
+                        to_agent.backstory += f"\n\nRésultat de {from_agent.role} : {result}"
+                        all_results.append(formatted_result)
+                        
+                        """print(f"{MAGENTA}AGENT{END} : \n{RED}{from_agent.role}{END}")
+                        print(f"{MAGENTA}KICKOFF FOR TASK DESCRIPTION{END} : \n{RED}{task.description}{END}")
+                        print(f"{MAGENTA}EXPECTED OUTPUT{END} : \n{RED}{task.expected_output}{END}")
+                        print(f"{MAGENTA}FROM BACKSTORY{END} : \n\n{GREEN}{from_agent.backstory}{END}")
+                        print(f"{MAGENTA}RESULT{END} : \n\n{YELLOW}{task.output.raw}{END}")"""
+                        print(f"{MAGENTA}RESULT{END} : \n\n{YELLOW}{task.output.raw}{END}")
+                        
+                        # print(f"TO BACKSTORY : \n\n{GREEN}{to_agent.backstory}{END}")
 
                 except Exception as e:
                     print(f"Erreur lors de l'exécution de la tâche : {str(e)}")
