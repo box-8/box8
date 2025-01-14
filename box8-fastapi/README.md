@@ -49,6 +49,49 @@ box8-fastapi/
 - `DELETE /delete-file/{filename}` : Supprime un fichier utilisateur
 - `GET /download-file/{filename}` : Télécharge un fichier utilisateur
 
+## Services
+
+#### CrewAI Service
+- Gestion des agents et des workflows
+- Exécution parallèle des tâches
+- Monitoring des performances
+- Gestion des erreurs et reprises
+- Cache des résultats fréquents
+
+#### Diagram Service
+- Génération de diagrammes via LLM
+- Validation des structures
+- Optimisation des layouts
+- Export multi-formats
+- Versioning des diagrammes
+
+#### Cache Service
+- Cache Redis pour les performances
+- Invalidation intelligente
+- Compression des données
+- Métriques de performance
+- Gestion de la mémoire
+
+## Monitoring
+
+### Métriques
+- Prometheus pour les métriques système
+- Grafana pour la visualisation
+- Alerting configurable
+- Métriques personnalisées :
+  - Temps de réponse API
+  - Utilisation mémoire/CPU
+  - Taux de succès/erreur
+  - Performance du cache
+  - Durée des workflows
+
+### Logging
+- Logs structurés JSON
+- Rotation automatique
+- Niveaux configurables
+- Contexte enrichi
+- Traçabilité des requêtes
+
 ## Configuration
 
 ### Variables d'Environnement

@@ -76,6 +76,38 @@ box8-react/
 - Raccourcis clavier
 - Tour guidé pour nouveaux utilisateurs
 
+### Nouvelles Fonctionnalités
+
+#### Éditeur Avancé
+- Suggestions intelligentes
+- Auto-complétion des propriétés
+- Validation en temps réel
+- Templates personnalisables
+- Historique des modifications
+- Collaboration en temps réel
+
+#### Visualisation
+- Modes de visualisation multiples
+- Statistiques d'exécution
+- Graphiques de performance
+- Timeline des événements
+- Export de rapports
+
+#### Intégrations
+- Partage via SharePoint
+- Export vers différents formats
+- Intégration avec des outils externes
+- API WebSocket pour temps réel
+- SSO et authentification OAuth2
+
+### Performance
+- Code splitting par routes
+- Prefetching intelligent
+- Cache optimisé
+- Service Worker pour offline
+- Compression des assets
+- Bundle size optimisé
+
 ## Dépendances Principales
 
 ```json
