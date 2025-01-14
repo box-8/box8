@@ -377,7 +377,7 @@ async def execute_process_from_diagram(data: Dict, folder: str, llm: str = "open
                     if rag=="Yes": 
                         print(f"RAG on {src}")
                         agents_dict[node['key']].tools = [choose_tool(src=src)]
-                        agents_dict[node['key']].verbose = True
+                        # agents_dict[node['key']].verbose = True
                         summarize = "No"
 
                     if summarize=="Force":
@@ -440,7 +440,8 @@ async def execute_process_from_diagram(data: Dict, folder: str, llm: str = "open
                         result = agent_results[from_key]
                         to_agent.backstory += f"\n\nRésultat de {from_agent.role} : {result}"
                         print(f"{MAGENTA}AGENT{END} : \n{RED}{from_agent.role}{END}")
-                        print(f"{MAGENTA}REUSING PREVIOUS RESULT FOR TASK{END} : \n{RED}{task.description}{END}")
+                        print(f"{MAGENTA}TASK DESCRIPTION{END} : \n{GREEN}{task.description}{END}")
+                        print(f"{MAGENTA}REUSING PREVIOUS RESULT FOR TASK{END} : \n{GREEN}{result}{END}")
                     else:
                         # Exécuter la tâche normalement
                         crew = Crew(agents=[from_agent], tasks=[task])
@@ -465,6 +466,8 @@ async def execute_process_from_diagram(data: Dict, folder: str, llm: str = "open
                         print(f"{MAGENTA}EXPECTED OUTPUT{END} : \n{RED}{task.expected_output}{END}")
                         print(f"{MAGENTA}FROM BACKSTORY{END} : \n\n{GREEN}{from_agent.backstory}{END}")
                         print(f"{MAGENTA}RESULT{END} : \n\n{YELLOW}{task.output.raw}{END}")"""
+                        print(f"{MAGENTA}AGENT{END} : \n{RED}{from_agent.role}{END}")
+                        print(f"{MAGENTA}TASK DESCRIPTION{END} : \n{RED}{task.description}{END}")
                         print(f"{MAGENTA}RESULT{END} : \n\n{YELLOW}{task.output.raw}{END}")
                         
                         # print(f"TO BACKSTORY : \n\n{GREEN}{to_agent.backstory}{END}")
