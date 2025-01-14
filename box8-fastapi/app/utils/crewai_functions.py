@@ -22,6 +22,10 @@ llm_configs = {
         "model": "mistral/mistral-medium-latest",
         "temperature": 0.2
     },
+    "mistral-large": {
+        "model": "mistral/mistral-large-latest",
+        "temperature": 0.2
+    },
     "mistral-8x7b": {
         "model": "mistral/open-mixtral-8x7b",
         "temperature": 0.2

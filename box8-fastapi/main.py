@@ -421,69 +421,69 @@ async def designer_get_llms(request: Request):
 @app.get("/designer/summarize_file/{filename}")
 async def summarize_file(request: Request, filename: str):
     """Résume le contenu d'un fichier utilisateur en utilisant CrewAI"""
-    print(f"\n{MAGENTA}[SUMMARY] Starting summary for file: {filename}{END}")
+    # print(f"\n{MAGENTA}[SUMMARY] Starting summary for file: {filename}{END}")
     
     session = request.cookies.get("session")
     if not session:
-        print(f"{RED}[SUMMARY] No session cookie found{END}")
+        # print(f"{RED}[SUMMARY] No session cookie found{END}")
         raise HTTPException(status_code=401, detail="Non authentifié")
         
     user = await get_current_user(session)
     if not user:
-        print(f"{RED}[SUMMARY] Authentication failed{END}")
+        # print(f"{RED}[SUMMARY] Authentication failed{END}")
         raise HTTPException(status_code=401, detail="Non authentifié")
     
-    print(f"{GREEN}[SUMMARY] User authenticated: {user['email']}{END}")
+    # print(f"{GREEN}[SUMMARY] User authenticated: {user['email']}{END}")
     user_folder = get_user_folder(user["email"])
     file_path = os.path.join(user_folder, filename)
-    print(f"{GREEN}[SUMMARY] File path: {file_path}{END}")
+    # print(f"{GREEN}[SUMMARY] File path: {file_path}{END}")
     
     if not os.path.exists(file_path):
-        print(f"{RED}[SUMMARY] File not found: {file_path}{END}")
+        # print(f"{RED}[SUMMARY] File not found: {file_path}{END}")
         raise HTTPException(status_code=404, detail="Fichier non trouvé")
     
     try:
-        print(f"{YELLOW}[SUMMARY] Starting CrewAI summarization with LLM: {request.cookies.get('selected_llm', 'openai')}{END}")
+        # print(f"{YELLOW}[SUMMARY] Starting CrewAI summarization with LLM: {request.cookies.get('selected_llm', 'openai')}{END}")
         summary = await crewai_summarize(file_path, pages=6, llm=request.cookies.get("selected_llm", 'openai'))
-        print(f"{GREEN}[SUMMARY] Summary generated successfully{END}")
+        # print(f"{GREEN}[SUMMARY] Summary generated successfully{END}")
         return {"summary": summary}
     except Exception as e:
-        print(f"{RED}[SUMMARY] Error during summarization: {str(e)}{END}")
+       #  print(f"{RED}[SUMMARY] Error during summarization: {str(e)}{END}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/designer/get_summary_file/{filename}")
 async def get_summary_file(request: Request, filename: str):
     """Récupère le contenu du fichier de résumé associé à un fichier"""
-    print(f"\n{MAGENTA}[GET SUMMARY] Getting summary for file: {filename}{END}")
+    # print(f"\n{MAGENTA}[GET SUMMARY] Getting summary for file: {filename}{END}")
     
     session = request.cookies.get("session")
     if not session:
-        print(f"{RED}[GET SUMMARY] No session cookie found{END}")
+        # print(f"{RED}[GET SUMMARY] No session cookie found{END}")
         raise HTTPException(status_code=401, detail="Non authentifié")
         
     user = await get_current_user(session)
     if not user:
-        print(f"{RED}[GET SUMMARY] Authentication failed{END}")
+        # print(f"{RED}[GET SUMMARY] Authentication failed{END}")
         raise HTTPException(status_code=401, detail="Non authentifié")
     
-    print(f"{GREEN}[GET SUMMARY] User authenticated: {user['email']}{END}")
+    # print(f"{GREEN}[GET SUMMARY] User authenticated: {user['email']}{END}")
     user_folder = get_user_folder(user["email"])
     file_path = os.path.join(user_folder, filename)
     summary_path = f"{file_path}.txt"
     
-    print(f"{GREEN}[GET SUMMARY] Summary path: {summary_path}{END}")
+    # print(f"{GREEN}[GET SUMMARY] Summary path: {summary_path}{END}")
     
     if not os.path.exists(summary_path):
-        print(f"{RED}[GET SUMMARY] Summary file not found: {summary_path}{END}")
+       #  print(f"{RED}[GET SUMMARY] Summary file not found: {summary_path}{END}")
         return {"has_summary": False, "summary": None}
     
     try:
         async with aiofiles.open(summary_path, 'r', encoding='utf-8') as file:
             content = await file.read()
-            print(f"{GREEN}[GET SUMMARY] Summary file read successfully{END}")
+           #  print(f"{GREEN}[GET SUMMARY] Summary file read successfully{END}")
             return {"has_summary": True, "summary": content}
     except Exception as e:
-        print(f"{RED}[GET SUMMARY] Error reading summary file: {str(e)}{END}")
+        # print(f"{RED}[GET SUMMARY] Error reading summary file: {str(e)}{END}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # Route de test
