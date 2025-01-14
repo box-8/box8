@@ -26,12 +26,27 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 # Copy static files from builder
 COPY --from=builder /app/build /usr/share/nginx/html
 
-# Create non-root user
-RUN adduser -D -H -u 1000 -s /sbin/nologin webuser && \
-    chown -R webuser:webuser /usr/share/nginx/html
+# Create directories and set permissions
+RUN mkdir -p /var/cache/nginx /var/run/nginx && \
+    chown -R nginx:nginx /var/cache/nginx /var/run/nginx /usr/share/nginx/html && \
+    chmod -R 755 /var/cache/nginx /var/run/nginx /usr/share/nginx/html && \
+    # Create pid directory with correct permissions
+    mkdir -p /var/run && \
+    touch /var/run/nginx.pid && \
+    chown -R nginx:nginx /var/run /var/run/nginx.pid && \
+    chmod -R 755 /var/run && \
+    chmod 644 /var/run/nginx.pid
 
-# Use non-root user
-USER webuser
+# Remove default nginx.conf to avoid permission issues
+RUN rm -f /etc/nginx/nginx.conf
+
+# Copy custom nginx configuration
+COPY nginx.conf /etc/nginx/nginx.conf
+RUN chown nginx:nginx /etc/nginx/nginx.conf && \
+    chmod 644 /etc/nginx/nginx.conf
+
+# Use nginx user
+USER nginx
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
