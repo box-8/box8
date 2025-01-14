@@ -77,7 +77,10 @@ const createTableFromMarkdown = (tableContent) => {
         children: headerCells.map(text => 
           new TableCell({
             children: [new Paragraph({
-              children: [new TextRun({ text, bold: true })],
+              children: parseTextWithBold(text).map(segment => new TextRun({ 
+                text: segment.text, 
+                bold: segment.bold || true // Toujours en gras pour l'en-tête
+              })),
               alignment: AlignmentType.CENTER
             })],
             shading: {
@@ -92,7 +95,10 @@ const createTableFromMarkdown = (tableContent) => {
           children: rowCells.map(text => 
             new TableCell({
               children: [new Paragraph({
-                children: [new TextRun({ text })],
+                children: parseTextWithBold(text).map(segment => new TextRun({ 
+                  text: segment.text,
+                  bold: segment.bold
+                })),
                 alignment: AlignmentType.LEFT
               })]
             })
@@ -101,6 +107,48 @@ const createTableFromMarkdown = (tableContent) => {
       ),
     ],
   });
+};
+
+const parseTextWithBold = (text) => {
+  const segments = [];
+  let currentIndex = 0;
+  let boldStart = -1;
+
+  while (currentIndex < text.length) {
+    // Chercher la prochaine paire de **
+    boldStart = text.indexOf('**', currentIndex);
+    
+    if (boldStart === -1) {
+      // Plus de ** trouvé, ajouter le reste du texte
+      if (currentIndex < text.length) {
+        segments.push({ text: text.slice(currentIndex), bold: false });
+      }
+      break;
+    }
+
+    // Ajouter le texte avant les **
+    if (boldStart > currentIndex) {
+      segments.push({ text: text.slice(currentIndex, boldStart), bold: false });
+    }
+
+    // Chercher la fin du texte en gras
+    const boldEnd = text.indexOf('**', boldStart + 2);
+    if (boldEnd === -1) {
+      // Pas de ** de fermeture trouvé, traiter le reste comme du texte normal
+      segments.push({ text: text.slice(currentIndex), bold: false });
+      break;
+    }
+
+    // Ajouter le texte en gras
+    const boldText = text.slice(boldStart + 2, boldEnd);
+    if (boldText) {
+      segments.push({ text: boldText, bold: true });
+    }
+
+    currentIndex = boldEnd + 2;
+  }
+
+  return segments;
 };
 
 export const downloadAsWord = async (markdownContent, filename = 'response') => {
@@ -161,10 +209,11 @@ export const downloadAsWord = async (markdownContent, filename = 'response') => 
           }));
         } else if (line.startsWith('- ')) {
           children.push(new Paragraph({
-            children: [new TextRun({
-              text: line.replace('- ', ''),
-              size: 24
-            })],
+            children: parseTextWithBold(line.replace('- ', '')).map(segment => new TextRun({
+              text: segment.text,
+              size: 24,
+              bold: segment.bold
+            })),
             bullet: { level: 0 },
             spacing: { before: 80, after: 80 }
           }));
@@ -175,11 +224,13 @@ export const downloadAsWord = async (markdownContent, filename = 'response') => 
             spacing: { before: 150, after: 150 }
           }));
         } else if (line.trim() !== '') {
+          const textSegments = parseTextWithBold(line);
           children.push(new Paragraph({
-            children: [new TextRun({
-              text: line,
-              size: 24
-            })],
+            children: textSegments.map(segment => new TextRun({
+              text: segment.text,
+              size: 24,
+              bold: segment.bold
+            })),
             spacing: { before: 80, after: 80 }
           }));
         } else {
