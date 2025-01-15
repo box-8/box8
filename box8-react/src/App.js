@@ -24,6 +24,7 @@ import Button from 'react-bootstrap/Button';
 import Cookies from 'js-cookie';
 import LoginModal from './components/LoginModal';
 import UserProfileModal from './components/UserProfileModal';
+import LoadingModal from './components/LoadingModal'; // Import the LoadingModal component
 
 const nodeTypes = {
   agent: AgentNode,
@@ -57,8 +58,85 @@ function Flow() {
   const [currentDiagramDescription, setCurrentDiagramDescription] = useState('');
   const [currentLLM, setCurrentLLM] = useState('openai');
   const [isCreatingCrewAI, setIsCreatingCrewAI] = useState(false);
+  const [currentTaskDescription, setCurrentTaskDescription] = useState("");
   const [ws, setWs] = useState(null);
   const { fitView, getNodes, getEdges } = useReactFlow();
+
+  // WebSocket connection management
+  useEffect(() => {
+    let websocket = null;
+    let reconnectTimeout = null;
+
+    const connectWebSocket = () => {
+      if (websocket?.readyState === WebSocket.OPEN) {
+        console.log('WebSocket already connected');
+        return;
+      }
+
+      websocket = new WebSocket('ws://localhost:8000/ws/diagram');
+      
+      websocket.onopen = () => {
+        console.log('WebSocket Connected');
+        setWs(websocket);
+      };
+
+      websocket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        console.log('WebSocket message received:', data);
+        
+        if (data.type === 'agent_highlight') {
+          setNodes((nds) => {
+            const newNodes = nds.map((node) => {
+              if (node.id === data.agent_id) {
+                return {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    status: data.status
+                  }
+                };
+              }
+              return node;
+            });
+            return newNodes;
+          });
+
+          if (data.task_description !== undefined) {
+            console.log('Setting task description:', data.task_description);
+            setCurrentTaskDescription(data.task_description);
+          }
+        }
+      };
+
+      websocket.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
+
+      websocket.onclose = (event) => {
+        console.log('WebSocket disconnected:', event.code, event.reason);
+        setWs(null);
+        
+        // Attempt to reconnect after 2 seconds
+        reconnectTimeout = setTimeout(() => {
+          console.log('Attempting to reconnect WebSocket...');
+          connectWebSocket();
+        }, 2000);
+      };
+    };
+
+    // Initial connection
+    connectWebSocket();
+
+    // Cleanup function
+    return () => {
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+      if (websocket) {
+        websocket.close();
+      }
+    };
+  }, []); // Empty dependency array since we want this to run once on mount
 
   // Vérifier l'état de l'authentification au chargement
   useEffect(() => {
@@ -109,57 +187,6 @@ function Flow() {
       user
     });
   }, [isAuthLoading, isAuthenticated, user]);
-
-  useEffect(() => {
-    const websocket = new WebSocket('ws://localhost:8000/ws/diagram');
-    
-    websocket.onopen = () => {
-      console.log('WebSocket Connected');
-    };
-
-    websocket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      console.log('WebSocket message received:', data);
-      if (data.type === 'agent_highlight') {
-        console.log('Updating agent status:', data.agent_id, data.status);
-        setNodes((nds) => {
-          const newNodes = nds.map((node) => {
-            if (node.id === data.agent_id) {
-              console.log('Found matching node:', node.id);
-              const updatedNode = {
-                ...node,
-                data: {
-                  ...node.data,
-                  status: data.status
-                }
-              };
-              console.log('Updated node:', updatedNode);
-              return updatedNode;
-            }
-            return node;
-          });
-          console.log('New nodes state:', newNodes);
-          return newNodes;
-        });
-      }
-    };
-
-    websocket.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
-
-    websocket.onclose = () => {
-      console.log('WebSocket disconnected');
-    };
-
-    setWs(websocket);
-
-    return () => {
-      if (websocket) {
-        websocket.close();
-      }
-    };
-  }, []);
 
   // Gestionnaire de connexion réussie
   const handleLoginSuccess = (data) => {
@@ -1161,6 +1188,11 @@ function Flow() {
         user={user}
         onLogout={handleLogout}
         onLLMChange={updateCurrentLLM}
+      />
+
+      <LoadingModal 
+        show={isCreatingCrewAI} 
+        taskDescription={currentTaskDescription} 
       />
     </div>
   );

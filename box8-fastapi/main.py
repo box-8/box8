@@ -52,9 +52,19 @@ async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
         while True:
-            data = await websocket.receive_text()
-            # Keep connection alive, actual messages are sent from diagram_service
-    except WebSocketDisconnect:
+            try:
+                # Keep the connection alive with ping/pong
+                data = await websocket.receive_text()
+                await websocket.send_text('pong')
+            except WebSocketDisconnect:
+                manager.disconnect(websocket)
+                break
+            except Exception as e:
+                print(f"WebSocket error: {str(e)}")
+                break
+    except Exception as e:
+        print(f"WebSocket connection error: {str(e)}")
+    finally:
         manager.disconnect(websocket)
 
 @app.middleware("http")

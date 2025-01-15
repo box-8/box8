@@ -575,7 +575,8 @@ async def execute_process_from_diagram(data: Dict, folder: str = "", llm: str = 
                         await manager.broadcast({
                             "type": "agent_highlight",
                             "agent_id": from_key,
-                            "status": "active"
+                            "status": "active",
+                            "task_description": f"Réutilisation du résultat de {from_agent.role}"
                         })
                         print(f"{MAGENTA}AGENT{END} : \n{RED}{from_agent.role}{END}")
                         print(f"{MAGENTA}TASK DESCRIPTION{END} : \n{GREEN}{task.description}{END}")
@@ -583,27 +584,31 @@ async def execute_process_from_diagram(data: Dict, folder: str = "", llm: str = 
                         await manager.broadcast({
                             "type": "agent_highlight",
                             "agent_id": from_key,
-                            "status": "inactive"
+                            "status": "inactive",
+                            "task_description": ""
                         })
                     else:
                         # Exécuter la tâche normalement
                         await manager.broadcast({
                             "type": "agent_highlight",
                             "agent_id": from_key,
-                            "status": "active"
+                            "status": "active",
+                            "task_description": task.description
                         })
                         crew = Crew(agents=[from_agent], tasks=[task])
                         kickoff = await crew.kickoff_async()
                         result = task.output.raw
-                        
+                        print(f"{MAGENTA}TASK RESULT{END} : \n{GREEN}{result}{END}")
                         # Stocker le résultat pour cet agent
                         agent_results[from_key] = result
                         to_agent.backstory += f"\n\nRésultat de {from_agent.role} : {result}"
                         await manager.broadcast({
                             "type": "agent_highlight",
                             "agent_id": from_key,
-                            "status": "inactive"
+                            "status": "inactive",
+                            "task_description": ""
                         })
+                        
                         formatted_result = (
                             f"\n\n***\n\n"
                             f"\n\n## {task.output.agent}\n\n"
@@ -614,17 +619,10 @@ async def execute_process_from_diagram(data: Dict, folder: str = "", llm: str = 
                         to_agent.backstory += f"\n\nRésultat de {from_agent.role} : {result}"
                         all_results.append(formatted_result)
                         
-                        """print(f"{MAGENTA}AGENT{END} : \n{RED}{from_agent.role}{END}")
-                        print(f"{MAGENTA}KICKOFF FOR TASK DESCRIPTION{END} : \n{RED}{task.description}{END}")
-                        print(f"{MAGENTA}EXPECTED OUTPUT{END} : \n{RED}{task.expected_output}{END}")
-                        print(f"{MAGENTA}FROM BACKSTORY{END} : \n\n{GREEN}{from_agent.backstory}{END}")
-                        print(f"{MAGENTA}RESULT{END} : \n\n{YELLOW}{task.output.raw}{END}")"""
                         print(f"{MAGENTA}AGENT{END} : \n{RED}{from_agent.role}{END}")
                         print(f"{MAGENTA}TASK DESCRIPTION{END} : \n{RED}{task.description}{END}")
                         print(f"{MAGENTA}RESULT{END} : \n\n{YELLOW}{task.output.raw}{END}")
                         
-                        # print(f"TO BACKSTORY : \n\n{GREEN}{to_agent.backstory}{END}")
-
                 except Exception as e:
                     print(f"Erreur lors de l'exécution de la tâche : {str(e)}")
 
