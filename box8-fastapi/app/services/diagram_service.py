@@ -2,10 +2,12 @@ import os
 import json
 import aiofiles
 from typing import Dict, List, Optional
+from fastapi import WebSocket
 from crewai import Agent, Crew, Task, Process
 from ..utils.crewai_functions import choose_llm, choose_tool, reset_chroma
 from ..utils.pdf_utils import extract_page_text_from_file
 import networkx as nx
+from ..websocket.manager import manager
 
 RED = '\033[31m'
 GREEN = '\033[32m'
@@ -456,7 +458,7 @@ async def generate_diagram_from_description(description: str, name: str = "Nouve
         print(f"Erreur : {str(e)}")
         raise ValueError(f"Échec de la génération du diagramme : {str(e)}")
 
-async def execute_process_from_diagram(data: Dict, folder: str, llm: str = "openai") -> Dict:
+async def execute_process_from_diagram(data: Dict, folder: str = "", llm: str = "openai") -> Dict:
     """
     Exécute un processus basé sur un diagramme de tâches et d'agents de manière asynchrone.
     
@@ -466,7 +468,7 @@ async def execute_process_from_diagram(data: Dict, folder: str, llm: str = "open
         llm (str): Modèle de langage à utiliser
         
     Returns:
-        Dict: Résultat de l'exécution du processus
+        Dict: Résultats de l'exécution du processus
     """
     print(llm)
     reset_chroma()
@@ -516,6 +518,17 @@ async def execute_process_from_diagram(data: Dict, folder: str, llm: str = "open
                 else:
                     print(f"Le fichier {file} n'existe pas.")
 
+        # Initialize node status
+        for node in data['nodes']:
+            try:
+                await manager.broadcast({
+                    "type": "agent_highlight",
+                    "agent_id": node['key'],
+                    "status": "inactive"
+                })
+            except Exception as e:
+                print(f"Error initializing agent status: {str(e)}")
+
         # Construire le graphe des tâches
         task_graph = nx.DiGraph()
         for link in links:
@@ -559,18 +572,38 @@ async def execute_process_from_diagram(data: Dict, folder: str, llm: str = "open
                         # Réutiliser le résultat existant
                         result = agent_results[from_key]
                         to_agent.backstory += f"\n\nRésultat de {from_agent.role} : {result}"
+                        await manager.broadcast({
+                            "type": "agent_highlight",
+                            "agent_id": from_key,
+                            "status": "active"
+                        })
                         print(f"{MAGENTA}AGENT{END} : \n{RED}{from_agent.role}{END}")
                         print(f"{MAGENTA}TASK DESCRIPTION{END} : \n{GREEN}{task.description}{END}")
                         print(f"{MAGENTA}REUSING PREVIOUS RESULT FOR TASK{END} : \n{GREEN}{result}{END}")
+                        await manager.broadcast({
+                            "type": "agent_highlight",
+                            "agent_id": from_key,
+                            "status": "inactive"
+                        })
                     else:
                         # Exécuter la tâche normalement
+                        await manager.broadcast({
+                            "type": "agent_highlight",
+                            "agent_id": from_key,
+                            "status": "active"
+                        })
                         crew = Crew(agents=[from_agent], tasks=[task])
                         kickoff = await crew.kickoff_async()
                         result = task.output.raw
                         
                         # Stocker le résultat pour cet agent
                         agent_results[from_key] = result
-                        
+                        to_agent.backstory += f"\n\nRésultat de {from_agent.role} : {result}"
+                        await manager.broadcast({
+                            "type": "agent_highlight",
+                            "agent_id": from_key,
+                            "status": "inactive"
+                        })
                         formatted_result = (
                             f"\n\n***\n\n"
                             f"\n\n## {task.output.agent}\n\n"

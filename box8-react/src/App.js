@@ -57,6 +57,7 @@ function Flow() {
   const [currentDiagramDescription, setCurrentDiagramDescription] = useState('');
   const [currentLLM, setCurrentLLM] = useState('openai');
   const [isCreatingCrewAI, setIsCreatingCrewAI] = useState(false);
+  const [ws, setWs] = useState(null);
   const { fitView, getNodes, getEdges } = useReactFlow();
 
   // Vérifier l'état de l'authentification au chargement
@@ -108,6 +109,57 @@ function Flow() {
       user
     });
   }, [isAuthLoading, isAuthenticated, user]);
+
+  useEffect(() => {
+    const websocket = new WebSocket('ws://localhost:8000/ws/diagram');
+    
+    websocket.onopen = () => {
+      console.log('WebSocket Connected');
+    };
+
+    websocket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      console.log('WebSocket message received:', data);
+      if (data.type === 'agent_highlight') {
+        console.log('Updating agent status:', data.agent_id, data.status);
+        setNodes((nds) => {
+          const newNodes = nds.map((node) => {
+            if (node.id === data.agent_id) {
+              console.log('Found matching node:', node.id);
+              const updatedNode = {
+                ...node,
+                data: {
+                  ...node.data,
+                  status: data.status
+                }
+              };
+              console.log('Updated node:', updatedNode);
+              return updatedNode;
+            }
+            return node;
+          });
+          console.log('New nodes state:', newNodes);
+          return newNodes;
+        });
+      }
+    };
+
+    websocket.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+
+    websocket.onclose = () => {
+      console.log('WebSocket disconnected');
+    };
+
+    setWs(websocket);
+
+    return () => {
+      if (websocket) {
+        websocket.close();
+      }
+    };
+  }, []);
 
   // Gestionnaire de connexion réussie
   const handleLoginSuccess = (data) => {

@@ -1,9 +1,10 @@
-from fastapi import FastAPI, Request, HTTPException, UploadFile, File, Response
+from fastapi import FastAPI, Request, HTTPException, UploadFile, File, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from app.routes.auth import router as auth_router
 from app.auth.auth import get_current_user, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 from app.routes.admin import router as admin_router
+from app.websocket.manager import manager
 import json
 import os
 from pydantic import BaseModel
@@ -43,8 +44,18 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"]
 )
+
+# WebSocket connection manager
+@app.websocket("/ws/diagram")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            # Keep connection alive, actual messages are sent from diagram_service
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
 
 @app.middleware("http")
 async def extend_session_middleware(request: Request, call_next):
@@ -212,7 +223,7 @@ async def designer_launch_crewai(request: Request):
         if not os.path.exists(user_folder):
             os.makedirs(user_folder)
             
-        result = await execute_process_from_diagram(data, user_folder, llm)
+        result = await execute_process_from_diagram(data, folder=user_folder, llm=llm)
         if not chat_input=='': 
             chat = await ask_process_from_diagram(chat_input, result["message"], llm)
             print(f"Chat renvoyé: {chat}")

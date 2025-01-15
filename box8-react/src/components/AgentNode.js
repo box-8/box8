@@ -23,13 +23,17 @@ const AgentNode = ({ data }) => {
   );
 
   return (
-    <div className={`agent-node ${data.selected ? 'selected' : ''}`}>
-      <Handle type="target" position={Position.Top} style={{ 
+    <div className={`agent-node ${data.selected ? 'selected' : ''} ${data.status === 'active' ? 'agent-active' : ''}`}>
+      <Handle 
+        type="target" 
+        position={Position.Top} 
+        style={{ 
           background: '#28a745',
           width: '15px',
           height: '15px',
           top: '-8px'
-        }}/>
+        }}
+      />
       <OverlayTrigger
         placement="auto"
         delay={{ show: 200, hide: 100 }}
@@ -40,14 +44,21 @@ const AgentNode = ({ data }) => {
           <p>{truncateText(data.goal, 8)}</p>
           <p>{truncateText(data.backstory, 8)}</p>
           {data.file && <p className="file-path">{data.file.split('/').pop()}</p>}
+          <div className="agent-status">
+            {data.status === 'active' && <span className="status-indicator">Active</span>}
+          </div>
         </div>
       </OverlayTrigger>
-      <Handle type="source" position={Position.Bottom} style={{ 
+      <Handle 
+        type="source" 
+        position={Position.Bottom} 
+        style={{ 
           background: '#a74528',
           width: '15px',
           height: '15px',
           bottom: '-8px'
-        }}/>
+        }}
+      />
     </div>
   );
 };
