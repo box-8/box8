@@ -504,6 +504,11 @@ async def get_summary_file(request: Request, filename: str):
         # print(f"{RED}[GET SUMMARY] Error reading summary file: {str(e)}{END}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
 # Route de test
 @app.get("/")
 async def root():

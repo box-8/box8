@@ -137,7 +137,7 @@ async def crewai_summarize(pdf: str, pages: int = -1, history: Optional[str] = N
             Task(
                 name="Synthèse Finale",
                 agent=final_agents["synthesizer"],
-                description=f"Crée une synthèse cohérente à partir des résumés suivants:\n{'---\n'.join(chunk_summaries)}",
+                description=f"Crée une synthèse cohérente à partir des résumés suivants:{chr(10)}{chr(10).join(['---'] + chunk_summaries)}",
                 expected_output="Une synthèse globale structurée en français au format markdown, incluant les points clés de chaque section."
             )
         ]
@@ -737,7 +737,7 @@ Je sais que le diagramme contient deux parties essentielles :
         backstory="""Je suis un expert qui traduit des descriptions textuelles en modifications concrètes de diagramme.
 Je comprends parfaitement la structure du JSON et je sais qu'il faut absolument préserver :
 - Les noms exacts des propriétés (key, type, role, etc.)
-- Le format des valeurs (chaînes de caractères, listes, objets)
+- Le format des valeurs (strings, arrays, objects)
 - La structure hiérarchique (nodes et links comme listes d'objets)""",
         llm=choose_llm(llm),
         verbose=True
