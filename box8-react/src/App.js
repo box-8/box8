@@ -60,7 +60,20 @@ function Flow() {
   const [isCreatingCrewAI, setIsCreatingCrewAI] = useState(false);
   const [currentTaskDescription, setCurrentTaskDescription] = useState("");
   const [ws, setWs] = useState(null);
-  const { fitView, getNodes, getEdges } = useReactFlow();
+  const [viewportInitialized, setViewportInitialized] = useState(false);
+  const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
+
+  // Gestionnaire de changement de viewport
+  const onMoveEnd = useCallback((event, viewport) => {
+    setViewport(viewport);
+  }, []);
+
+  // Initialiser le viewport une seule fois
+  useEffect(() => {
+    if (!viewportInitialized) {
+      setViewportInitialized(true);
+    }
+  }, [viewportInitialized]);
 
   // WebSocket connection management
   useEffect(() => {
@@ -86,7 +99,7 @@ function Flow() {
         
         if (data.type === 'agent_highlight') {
           setNodes((nds) => {
-            const newNodes = nds.map((node) => {
+            return nds.map((node) => {
               if (node.id === data.agent_id) {
                 return {
                   ...node,
@@ -98,36 +111,17 @@ function Flow() {
               }
               return node;
             });
-            return newNodes;
           });
 
           if (data.task_description !== undefined) {
-            console.log('Setting task description:', data.task_description);
             setCurrentTaskDescription(data.task_description);
           }
         }
       };
-
-      websocket.onerror = (error) => {
-        console.error('WebSocket error:', error);
-      };
-
-      websocket.onclose = (event) => {
-        console.log('WebSocket disconnected:', event.code, event.reason);
-        setWs(null);
-        
-        // Attempt to reconnect after 2 seconds
-        reconnectTimeout = setTimeout(() => {
-          console.log('Attempting to reconnect WebSocket...');
-          connectWebSocket();
-        }, 2000);
-      };
     };
 
-    // Initial connection
     connectWebSocket();
 
-    // Cleanup function
     return () => {
       if (reconnectTimeout) {
         clearTimeout(reconnectTimeout);
@@ -136,7 +130,7 @@ function Flow() {
         websocket.close();
       }
     };
-  }, []); // Empty dependency array since we want this to run once on mount
+  }, []);
 
   // Vérifier l'état de l'authentification au chargement
   useEffect(() => {
@@ -701,7 +695,7 @@ function Flow() {
         : `${diagramData.name}.json`;
 
       // Préparer les données du diagramme
-      const nodes = getNodes().map(node => ({
+      const nodes = nodes.map(node => ({
         key: node.id,
         type: node.type,
         role: node.data.role,
@@ -714,7 +708,7 @@ function Flow() {
         position: node.position
       }));
 
-      const edges = getEdges().map(edge => ({
+      const edges = edges.map(edge => ({
         id: edge.id,
         from: edge.source,
         to: edge.target,
@@ -795,19 +789,12 @@ function Flow() {
         }
 
         handleLoadDiagram(data, currentDiagramName);
-        // Ajout du fitView après un court délai pour laisser le temps au diagramme de se charger
-        setTimeout(() => {
-          fitView({ padding: 0.2 });
-        }, 100);
       })
       .catch(error => console.error('Error refreshing diagram:', error));
-  }, [currentDiagramName, handleLoadDiagram, fitView]);
+  }, [currentDiagramName, handleLoadDiagram]);
 
   // Gestionnaire de sélection des nœuds
   const onNodeClick = useCallback((event, node) => {
-    setSelectedNode(node);
-    setSelectedEdge(null); // Désélectionner l'edge si un nœud est sélectionné
-    // Mettre à jour les données des nœuds pour refléter la sélection
     setNodes((nds) =>
       nds.map((n) => ({
         ...n,
@@ -817,19 +804,16 @@ function Flow() {
         }
       }))
     );
-  }, [setNodes]);
+    // Désélectionner le nœud si on clique à nouveau dessus
+    if (selectedNode && selectedNode.id === node.id) {
+      setSelectedNode(null);
+    } else {
+      setSelectedNode(node);
+    }
+  }, [setNodes, selectedNode]);
 
   // Gestionnaire de sélection des edges
   const onEdgeClick = useCallback((event, edge) => {
-    setSelectedEdge(edge);
-    setSelectedNode(null); // Désélectionner le nœud si un edge est sélectionné
-  }, []);
-
-  // Gestionnaire de désélection
-  const onPaneClick = useCallback(() => {
-    setSelectedNode(null);
-    setSelectedEdge(null);
-    // Réinitialiser la sélection de tous les nœuds
     setNodes((nds) =>
       nds.map((n) => ({
         ...n,
@@ -839,6 +823,23 @@ function Flow() {
         }
       }))
     );
+    setSelectedNode(null);
+    setSelectedEdge(edge);
+  }, [setNodes]);
+
+  // Gestionnaire de clic sur le fond
+  const onPaneClick = useCallback(() => {
+    setNodes((nds) =>
+      nds.map((n) => ({
+        ...n,
+        data: {
+          ...n.data,
+          selected: false
+        }
+      }))
+    );
+    setSelectedNode(null);
+    setSelectedEdge(null);
   }, [setNodes]);
 
   // Gestionnaire d'appui sur les touches
@@ -875,10 +876,10 @@ function Flow() {
   useEffect(() => {
     if (nodes.length > 0) {
       setTimeout(() => {
-        fitView({ padding: 0.2 });
+        setViewport({ x: 0, y: 0, zoom: 1 });
       }, 100);
     }
-  }, [nodes, fitView]);
+  }, [nodes]);
 
   // Fonction pour mettre à jour le LLM courant
   const updateCurrentLLM = (llm) => {
@@ -945,7 +946,7 @@ function Flow() {
     
     if (diagramData.nodes && diagramData.links) {
       // Récupérer les positions maximales actuelles
-      const currentNodes = getNodes();
+      const currentNodes = nodes;
       let maxX = 0;
       let maxY = 0;
       
@@ -1012,12 +1013,10 @@ function Flow() {
       
       // Ajuster la vue pour montrer tous les nœuds
       setTimeout(() => {
-        if (fitView) {
-          fitView({ padding: 0.2 });
-        }
+        setViewport({ x: 0, y: 0, zoom: 1 });
       }, 100);
     }
-  }, [getNodes, setNodes, setEdges, fitView]);
+  }, [nodes, setNodes, setEdges]);
 
   // Écouteur pour l'événement showResponse
   useEffect(() => {
@@ -1085,12 +1084,18 @@ function Flow() {
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodeClick={onNodeClick}
-        onEdgeClick={onEdgeClick}
-        onPaneClick={onPaneClick}
         onNodeDoubleClick={onNodeDoubleClick}
         onEdgeDoubleClick={onEdgeDoubleClick}
-        deleteKeyCode={null}
-        style={{ background: '#ffffff' }}
+        onEdgeClick={onEdgeClick}
+        onPaneClick={onPaneClick}
+        onMoveEnd={onMoveEnd}
+        defaultViewport={viewport}
+        fitView={false}
+        onlyRenderVisibleElements={true}
+        fitViewOptions={{ padding: 0.2, duration: 0 }}
+        minZoom={0.1}
+        maxZoom={4}
+        preventScrolling={true}
       >
         <Background />
         <Controls />
@@ -1172,7 +1177,6 @@ function Flow() {
         onFileSelect={handleLoadDiagram}
         onImportDiagram={handleImportDiagram}
         onNewDiagram={handleNewDiagram}
-        reactFlowInstance={{ fitView }}
         hasCurrentDiagram={nodes.length > 1} // On vérifie s'il y a plus d'un nœud (car le nœud output est toujours présent)
       />
 
