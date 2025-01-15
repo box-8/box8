@@ -291,121 +291,91 @@ async def generate_diagram_from_description(description: str, name: str = "Nouve
     """
     Génère un diagramme à partir d'une description textuelle en utilisant CrewAI de manière asynchrone.
     """
-    production = True
-    if production:
-        # Créer l'agent expert en conception de diagrammes
-        diagram_expert = Agent(
-            role='Expert en Conception de Diagrammes',
-            goal='Créer un diagramme complet et bien structuré à partir de descriptions textuelles',
-            backstory="""Vous êtes un expert dans la création de diagrammes qui représentent des workflows complexes. 
-            Vous excellez dans l'identification des agents clés, leurs rôles et les relations entre eux.""",
-            verbose=True,
-            allow_delegation=False
-        )
 
-        # Créer l'agent expert en analyse de texte
-        text_analyst = Agent(
-            role='Expert en Analyse de Texte',
-            goal='Extraire les composants clés et les relations à partir de descriptions textuelles',
-            backstory="""Vous êtes spécialisé dans l'analyse de texte pour identifier les entités importantes, 
-            leurs caractéristiques et la façon dont elles interagissent entre elles.""",
-            verbose=True,
-            allow_delegation=False
-        )
+    # Créer l'agent expert en conception de diagrammes
+    diagram_expert = Agent(
+        role='Expert en Conception de Diagrammes',
+        goal='Créer un diagramme complet et bien structuré à partir de descriptions textuelles',
+        backstory="""Vous êtes un expert dans la création de diagrammes qui représentent des workflows complexes. 
+        Vous excellez dans l'identification des agents clés, leurs rôles et les relations entre eux.""",
+        verbose=True,
+        allow_delegation=False
+    )
 
-        # Définir les tâches
-        analyze_text = Task(
-            description=f"""Analysez la description suivante et identifiez :
-            1. Les agents/acteurs clés
-            2. Leurs rôles et responsabilités
-            3. Les relations et interactions entre eux
-            
-            Description : {description}
-            
-            Fournissez votre analyse dans un format structuré qui peut être utilisé pour créer un workflow avec CrewAI.""",
-            agent=text_analyst,
-            expected_output="""Une analyse structurée du texte contenant :
-            1. Liste des agents identifiés avec leurs rôles
-            2. Liste des tâches/relations entre les agents
-            3. Toute information supplémentaire pertinente pour la création du workflow"""
-        )
+    # Créer l'agent expert en analyse de texte
+    text_analyst = Agent(
+        role='Expert en Analyse de Texte',
+        goal='Extraire les composants clés et les relations à partir de descriptions textuelles',
+        backstory="""Vous êtes spécialisé dans l'analyse de texte pour identifier les entités importantes, 
+        leurs caractéristiques et la façon dont elles interagissent entre elles.""",
+        verbose=True,
+        allow_delegation=False
+    )
 
-        create_diagram = Task(
-            description=f"""À partir de l'analyse du workflow, créez une structure de diagramme avec :
-            1. Des nœuds représentant les agents avec leurs propriétés
-            2. Des liens représentant les tâches/relations entre les agents
-            Les références circulaires sont proscrites.
-            
-            La sortie doit être une structure JSON valide suivant ce format :
-            {{
-                "name": "{name}",
-                "description": "{description}",
-                "nodes": [
-                    {{
-                        "key": "identifiant_unique",
-                        "type": "agent",
-                        "role": "Rôle de l'Agent",
-                        "goal": "Objectif de l'Agent",
-                        "backstory": "Histoire de l'Agent",
-                        "file":""
-                    }}
-                ],
-                "links": [
-                    {{
-                        "id": "identifiant_unique",
-                        "from": "id_noeud_source",
-                        "to": "id_noeud_cible",
-                        "description": "Description de la Tâche",
-                        "expected_output": "Sortie Attendue",
-                        "type": "task"
-                    }}
-                ]
-            }}""",
-            agent=diagram_expert,
-            expected_output="""Une chaîne JSON valide représentant la structure du diagramme avec :
-            1. Un tableau de nœuds contenant les définitions des agents
-            2. Un tableau de liens contenant les définitions des tâches/relations
-            Le JSON doit suivre exactement le format spécifié."""
-        )
+    # Définir les tâches
+    analyze_text = Task(
+        description=f"""Analysez la description suivante et identifiez :
+        1. Les agents/acteurs clés
+        2. Leurs rôles et responsabilités
+        3. Les relations et interactions entre eux
+        
+        Description : {description}
+        
+        Fournissez votre analyse dans un format structuré qui peut être utilisé pour créer un workflow avec CrewAI.""",
+        agent=text_analyst,
+        expected_output="""Une analyse structurée du texte contenant :
+        1. Liste des agents identifiés avec leurs rôles
+        2. Liste des tâches/relations entre les agents
+        3. Toute information supplémentaire pertinente pour la création du workflow"""
+    )
 
-        # Créer et exécuter le crew
-        crew = Crew(
-            agents=[text_analyst, diagram_expert],
-            tasks=[analyze_text, create_diagram]
-        )
-
-        kickoff = await crew.kickoff_async()
-        result = kickoff.raw
-    else:
-        # Exemple de diagramme de tâches et d'agents
-        result = f"""{{
-    "name": "{name}",
-    "description": "{description}",
-    "nodes": [
+    create_diagram = Task(
+        description=f"""À partir de l'analyse du workflow, créez une structure de diagramme avec :
+        1. Des nœuds représentant les agents avec leurs propriétés
+        2. Des liens représentant les tâches/relations entre les agents
+        Les références circulaires sont proscrites.
+        
+        La sortie doit être une structure JSON valide suivant ce format :
         {{
-        "key": "output",
-        "role": "Output",
-        "goal": "output",
-        "category": "output"
-        }},
-        {{
-        "role": "poete",
-        "goal": "écrire des poêmes",
-        "backstory": "le poête écrit sur des thèmes variés selon son inspiration du moment ",
-        "file": "",
-        "key": "1735033913363"
-        }}
-    ],
-    "links": [
-        {{
-        "from": "1735033913363",
-        "to": "output",
-        "relationship": "",
-        "description": "écrire un sonnet",
-        "expected_output": "un sonnet sur un thème au choix du poête"
-        }}
-    ]
-    }}"""
+            "name": "{name}",
+            "description": "{description}",
+            "nodes": [
+                {{
+                    "key": "identifiant_unique",
+                    "type": "agent",
+                    "role": "Rôle de l'Agent",
+                    "goal": "Objectif de l'Agent",
+                    "backstory": "Histoire de l'Agent",
+                    "file":""
+                }}
+            ],
+            "links": [
+                {{
+                    "id": "identifiant_unique",
+                    "from": "id_noeud_source",
+                    "to": "id_noeud_cible",
+                    "description": "Description de la Tâche",
+                    "expected_output": "Sortie Attendue",
+                    "type": "task"
+                }}
+            ]
+        }}""",
+        agent=diagram_expert,
+        expected_output="""Une chaîne JSON valide représentant la structure du diagramme avec :
+        1. Un tableau de nœuds contenant les définitions des agents
+        2. Un tableau de liens contenant les définitions des tâches/relations
+        Le JSON doit suivre exactement le format spécifié."""
+    )
+
+    # Créer et exécuter le crew
+    crew = Crew(
+        agents=[text_analyst, diagram_expert],
+        tasks=[analyze_text, create_diagram]
+    )
+
+    kickoff = await crew.kickoff_async()
+    result = kickoff.raw
+   
 
     try:
         # Extraire le JSON de la réponse
