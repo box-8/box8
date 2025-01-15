@@ -695,7 +695,7 @@ function Flow() {
         : `${diagramData.name}.json`;
 
       // Préparer les données du diagramme
-      const nodes = nodes.map(node => ({
+      const diagramNodes = nodes.map(node => ({
         key: node.id,
         type: node.type,
         role: node.data.role,
@@ -708,7 +708,7 @@ function Flow() {
         position: node.position
       }));
 
-      const edges = edges.map(edge => ({
+      const diagramEdges = edges.map(edge => ({
         id: edge.id,
         from: edge.source,
         to: edge.target,
@@ -720,8 +720,8 @@ function Flow() {
       const diagramJson = {
         name: diagramData.name,
         description: diagramData.description,
-        nodes: nodes,
-        links: edges
+        nodes: diagramNodes,
+        links: diagramEdges
       };
 
       const response = await fetch('http://localhost:8000/designer/save-diagram', {
