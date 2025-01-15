@@ -441,7 +441,7 @@ async def summarize_file(request: Request, filename: str):
     
     try:
         # print(f"{YELLOW}[SUMMARY] Starting CrewAI summarization with LLM: {request.cookies.get('selected_llm', 'openai')}{END}")
-        summary = await crewai_summarize(file_path, pages=6, llm=request.cookies.get("selected_llm", 'openai'))
+        summary = await crewai_summarize(file_path, pages=-1, llm=request.cookies.get("selected_llm", 'openai'))
         # print(f"{GREEN}[SUMMARY] Summary generated successfully{END}")
         return {"summary": summary}
     except Exception as e:

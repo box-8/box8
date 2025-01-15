@@ -38,7 +38,128 @@ async def crewai_summarize_if_not_exists(pdf: str, pages: int = 6, history: Opti
         print(f"Le fichier {pdf} n'existe pas, on le génère.")
         return await crewai_summarize(pdf, pages=pages, history=history, llm=llm)
 
-async def crewai_summarize(pdf: str, pages: int = 6, history: Optional[str] = None, llm: str = "openai") -> str:
+async def crewai_summarize(pdf: str, pages: int = -1, history: Optional[str] = None, llm: str = "openai") -> str:
+    """
+    Génère un résumé d'un document PDF en utilisant CrewAI de manière asynchrone.
+    
+    Args:
+        pdf (str): Chemin vers le fichier PDF
+        pages (int): Nombre de pages à traiter (-1 pour tout le document)
+        history (Optional[str]): Historique des interactions (non utilisé pour l'instant)
+        llm (str): Modèle de langage à utiliser
+        
+    Returns:
+        str: Résumé généré par CrewAI
+    """
+    # Extraction du texte de toutes les pages
+    all_pages = await extract_page_text_from_file(src=pdf)
+    
+    # Détermination du nombre de pages à traiter
+    if pages <= 0:
+        pages = len(all_pages)
+    else:
+        pages = min(pages, len(all_pages))
+    
+    # Estimation approximative des tokens (environ 200 tokens par page en moyenne)
+    tokens_per_chunk = 2000  # Limite conservative pour éviter les dépassements
+    pages_per_chunk = max(1, tokens_per_chunk // 200)
+    
+    # Traitement par chunks
+    chunks = []
+    for i in range(0, pages, pages_per_chunk):
+        end_idx = min(i + pages_per_chunk, pages)
+        chunk_pages = all_pages[i:end_idx]
+        chunk_text = "\n".join(chunk_pages)
+        chunks.append(chunk_text)
+    
+    # Traitement de chaque chunk
+    chunk_summaries = []
+    for chunk_idx, chunk in enumerate(chunks):
+        # Définition des agents pour ce chunk
+        agents = {
+            "title_extractor": Agent(
+                name=f"Extracteur de Titres - Partie {chunk_idx + 1}",
+                role="Expert en identification de titres",
+                goal="Identifier les titres et thèmes principaux de cette section",
+                backstory="Un spécialiste dans l'identification rapide de titres et de sujets principaux.",
+                llm=choose_llm(llm)
+            ),
+            "content_analyzer": Agent(
+                name=f"Analyseur de Contenu - Partie {chunk_idx + 1}",
+                role="Expert en analyse de contenu",
+                goal="Analyser et résumer le contenu de cette section",
+                backstory="Un expert en analyse et synthèse de texte, capable d'extraire les informations essentielles.",
+                llm=choose_llm(llm)
+            )
+        }
+
+        # Définition des tâches pour ce chunk
+        tasks = [
+            Task(
+                name=f"Analyse des Titres - Partie {chunk_idx + 1}",
+                agent=agents["title_extractor"],
+                description=f"Identifie les titres et thèmes principaux de cette section:\n{chunk}",
+                expected_output="Les titres et thèmes principaux en français."
+            ),
+            Task(
+                name=f"Analyse du Contenu - Partie {chunk_idx + 1}",
+                agent=agents["content_analyzer"],
+                description=f"Analyse et résume cette section du document:\n{chunk}",
+                expected_output="Un résumé structuré en français avec les informations clés au format markdown."
+            )
+        ]
+
+        # Création et exécution du crew pour ce chunk
+        crew = Crew(
+            agents=list(agents.values()),
+            tasks=tasks,
+            process=Process.sequential
+        )
+
+        result = await crew.kickoff_async()
+        chunk_summaries.append(result.raw)
+
+    # Si nous avons plusieurs chunks, créons un résumé final
+    if len(chunk_summaries) > 1:
+        final_agents = {
+            "synthesizer": Agent(
+                name="Synthétiseur Final",
+                role="Expert en synthèse globale",
+                goal="Créer une synthèse cohérente de l'ensemble du document",
+                backstory="Un expert en synthèse capable de combiner plusieurs résumés en un ensemble cohérent.",
+                llm=choose_llm(llm)
+            )
+        }
+
+        final_tasks = [
+            Task(
+                name="Synthèse Finale",
+                agent=final_agents["synthesizer"],
+                description=f"Crée une synthèse cohérente à partir des résumés suivants:\n{'---\n'.join(chunk_summaries)}",
+                expected_output="Une synthèse globale structurée en français au format markdown, incluant les points clés de chaque section."
+            )
+        ]
+
+        final_crew = Crew(
+            agents=list(final_agents.values()),
+            tasks=final_tasks,
+            process=Process.sequential
+        )
+
+        final_result = await final_crew.kickoff_async()
+        result_str = final_result.raw
+    else:
+        result_str = chunk_summaries[0]
+
+    # Sauvegarde du résultat
+    txt_path = f"{pdf}.txt"
+    async with aiofiles.open(txt_path, "w", encoding="utf-8") as file:
+        await file.write(result_str)
+
+    return result_str
+
+
+async def crewai_summarize_old(pdf: str, pages: int = 6, history: Optional[str] = None, llm: str = "openai") -> str:
     """
     Génère un résumé d'un document PDF en utilisant CrewAI de manière asynchrone.
     
@@ -122,7 +243,6 @@ async def crewai_summarize(pdf: str, pages: int = 6, history: Optional[str] = No
     return result_str
 
 
-
 async def generate_diagram_check_structure(diagramData):
     """
     Check the structure of the diagramData and return a json
@@ -141,7 +261,7 @@ async def generate_diagram_check_structure(diagramData):
     create_diagram = Task(
         description=f"""À partir de l'analyse du json suivant, améliorer la structure du diagramme :
         1. en supprimant les liens formant des relations circulaires entre les nœuds du diagramme
-        2. en vérifiant qu'au moins un nœud est lié par une relationau nœud output 
+        2. en vérifiant qu'au moins un nœud est lié par une relation au nœud output 
         4. en ajoutant du détail aux relations pointant vers le noeud output (tâche attendue, description, expected outpout) 
         
         JSON : {json.dumps(diagramData, indent=2)}
@@ -628,24 +748,8 @@ Je comprends parfaitement la structure du JSON et je sais qu'il faut absolument 
         goal="Appliquer les modifications en conservant strictement le format JSON",
         backstory="""Je suis un expert qui modifie les diagrammes tout en maintenant leur cohérence.
 Ma priorité absolue est de préserver la structure exacte du JSON :
-1. Pour les nœuds (nodes) :
-   - key: identifiant unique du nœud
-   - type: type du nœud (agent ou output)
-   - role: rôle du nœud
-   - goal: objectif du nœud
-   - backstory: histoire du nœud
-   - tools: liste des outils
-   - file: fichier associé (optionnel)
-   - summarize: Yes/No
-   - position: {x: number, y: number}
-
-2. Pour les liens (links) :
-   - id: identifiant unique du lien
-   - from: nœud source
-   - to: nœud destination
-   - description: description de la tâche
-   - expected_output: sortie attendue
-   - relationship: type de relation""",
+1. Pour les nodes : key, type, role, goal, backstory, tools, file, summarize, position
+2. Pour les links : id, from, to, description, expected_output, relationship""",
         llm=choose_llm(llm),
         verbose=False
     )
