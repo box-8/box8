@@ -6,55 +6,108 @@ from crewai_tools import (PDFSearchTool,
                          CSVSearchTool)
 import chromadb
 from chromadb.config import Settings
+from typing import Optional
+import requests
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Configuration globale des LLMs
 llm_configs = {
-    "hosted": {
-        "model": "hosted_vllm/cognitivecomputations/dolphin-2.9-llama3-8b",
-        "base_url": "https://7j88lv8yvcrcsm-8000.proxy.runpod.net/v1",
-        "api_key": "token-abc123"
-    },
     "local": {
         "model": "ollama/gemma2:2b",
         "base_url": "http://localhost:11434"
     },
+    "openai": {
+        "model": "gpt-4",
+        "temperature": 0.2,
+        "api_key": os.getenv("OPENAI_API_KEY")
+    },
     "mistral": {
         "model": "mistral/mistral-medium-latest",
-        "temperature": 0.2
-    },
-    "mistral-large": {
-        "model": "mistral/mistral-large-latest",
-        "temperature": 0.2
-    },
-    "mistral-8x7b": {
-        "model": "mistral/open-mixtral-8x7b",
-        "temperature": 0.2
-    },
-    "mistral-8x22b": {
-        "model": "mistral/open-mixtral-8x22b",
-        "temperature": 0.2
+        "temperature": 0.2,
+        "api_key": os.getenv("MISTRAL_API_KEY")
     },
     "groq": {
         "model": "groq/mixtral-8x7b-32768",
-        "temperature": 0.2
-    },
-    "groq-llama": {
-        "model": "groq/llama-3.1-70b-versatile",
-        "temperature": 0.2
-    },
-    "groq-llama3": {
-        "model": "groq/llama3-8b-8192",
-        "temperature": 0.2
-    },
-    "openai": {
-        "model": "gpt-4",
-        "temperature": 0.2
-    },
-    "claude": {
-        "model": "claude-3-5-sonnet-20240620",
-        "temperature": 0.2
+        "temperature": 0.2,
+        "api_key": os.getenv("GROQ_API_KEY")
     }
 }
+
+def check_llm_availability(config: dict) -> bool:
+    """
+    Check if an LLM is available and properly configured.
+    
+    Args:
+        config (dict): LLM configuration
+        
+    Returns:
+        bool: True if LLM is available, False otherwise
+    """
+    try:
+        # Check for API key if needed
+        if "api_key" in config and not config["api_key"]:
+            return False
+            
+        # For local models, check if the service is running
+        if config.get("base_url", "").startswith("http://localhost"):
+            try:
+                response = requests.get(config["base_url"])
+                return response.status_code == 200
+            except requests.RequestException:
+                return False
+                
+        return True
+    except Exception:
+        return False
+
+def get_available_llm() -> Optional[str]:
+    """
+    Get the first available LLM from the configuration.
+    
+    Returns:
+        Optional[str]: Name of the first available LLM, or None if none are available
+    """
+    priority_order = ["local", "openai", "mistral", "groq"]
+    
+    for llm_name in priority_order:
+        if llm_name in llm_configs and check_llm_availability(llm_configs[llm_name]):
+            return llm_name
+    return None
+
+def choose_llm(name: str = "") -> LLM:
+    """
+    Sélectionne et configure un modèle de langage en fonction du nom fourni.
+    
+    Args:
+        name (str): Nom du modèle à utiliser
+        
+    Returns:
+        LLM: Instance du modèle de langage configuré
+        
+    Raises:
+        RuntimeError: Si aucun LLM n'est disponible
+    """
+    if not name:
+        name = get_available_llm()
+        if not name:
+            raise RuntimeError("No LLM available. Please check your configuration and API keys.")
+    
+    config = llm_configs.get(name)
+    if not config:
+        raise ValueError(f"Unknown LLM: {name}")
+        
+    if not check_llm_availability(config):
+        available_llm = get_available_llm()
+        if not available_llm:
+            raise RuntimeError("No LLM available. Please check your configuration and API keys.")
+        print(f"Warning: {name} is not available, falling back to {available_llm}")
+        name = available_llm
+        config = llm_configs[name]
+    
+    return LLM(**config)
 
 def reset_chroma() -> bool:
     """
@@ -72,22 +125,6 @@ def reset_chroma() -> bool:
         state = False
     print(f"Chromadb reset : {state}")
     return state
-
-def choose_llm(name: str = "") -> LLM:
-    """
-    Sélectionne et configure un modèle de langage en fonction du nom fourni.
-    
-    Args:
-        name (str): Nom du modèle à utiliser
-    ollama run gemma2:2b
-    Returns:
-        LLM: Instance du modèle de langage configuré
-    """
-    if name == "":
-        name = "openai"
-
-    config = llm_configs.get(name, llm_configs["openai"])
-    return LLM(**config)
 
 def choose_tool(src: str):
     """

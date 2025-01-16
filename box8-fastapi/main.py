@@ -34,16 +34,20 @@ app = FastAPI(
 
 # Configuration CORS avec support des cookies
 origins = [
-    "http://localhost:3000",  # Frontend React
-    "http://127.0.0.1:3000"
+    "http://localhost:3000",  # Frontend React local
+    "http://127.0.0.1:3000",  # Frontend React local alternative
+    "https://box8-react-9b3d144b9fe7.herokuapp.com"  # Frontend React on Heroku
 ]
 
+# Add middleware for CORS with preflight support
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],  
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600  
 )
 
 # WebSocket connection manager
@@ -214,15 +218,15 @@ async def designer_delete_diagram(filename: str):
 @app.post("/designer/launch-crewai")
 async def designer_launch_crewai(request: Request):
     """Lance le processus CrewAI à partir d'un diagramme"""
-    session = request.cookies.get("session")
-    if not session:
-        raise HTTPException(status_code=401, detail="Non authentifié")
-    
-    user = await get_current_user(session)
-    if not user:
-        raise HTTPException(status_code=401, detail="Session invalide")
-
     try:
+        session = request.cookies.get("session")
+        if not session:
+            raise HTTPException(status_code=401, detail="Non authentifié")
+        
+        user = await get_current_user(session)
+        if not user:
+            raise HTTPException(status_code=401, detail="Session invalide")
+
         data = await request.json()
         user_folder = get_user_folder(user["email"])
         llm = request.cookies.get("selected_llm", 'openai')
@@ -239,8 +243,17 @@ async def designer_launch_crewai(request: Request):
             print(f"Chat renvoyé: {chat}")
             result["message"] += chat
 
-        return JSONResponse(result)
+        return JSONResponse(
+            content=result,
+            headers={
+                "Access-Control-Allow-Origin": "https://box8-react-9b3d144b9fe7.herokuapp.com",
+                "Access-Control-Allow-Credentials": "true",
+                "Access-Control-Allow-Methods": "POST, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            }
+        )
     except Exception as e:
+        print(f"Error in launch-crewai: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
