@@ -8,7 +8,6 @@ import Tabs from 'react-bootstrap/Tabs';
 import Tab from 'react-bootstrap/Tab';
 import Table from 'react-bootstrap/Table';
 import 'bootstrap-icons/font/bootstrap-icons.css';
-import config from '../config';
 
 const UserProfileModal = ({ show, onHide, user, onLogout, onLLMChange }) => {
   const [files, setFiles] = useState([]);
@@ -22,12 +21,12 @@ const UserProfileModal = ({ show, onHide, user, onLogout, onLLMChange }) => {
   const fileInputRef = useRef();
 
   const getFileUrl = (fileName) => {
-    return `${config.API_URL}/designer/get_user_file/${encodeURIComponent(fileName)}`;
+    return `http://localhost:8000/designer/get_user_file/${encodeURIComponent(fileName)}`;
   };
 
   const handleLLMChange = async (llm) => {
     try {
-      const response = await fetch(`${config.API_URL}/designer/set-llm`, {
+      const response = await fetch('http://localhost:8000/designer/set-llm', {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -50,7 +49,7 @@ const UserProfileModal = ({ show, onHide, user, onLogout, onLLMChange }) => {
       loadUserFiles();
       const fetchLLMConfigs = async () => {
         try {
-          const response = await fetch(`${config.API_URL}/designer/get-llms`, {
+          const response = await fetch('http://localhost:8000/designer/get-llms', {
             credentials: 'include' // Important pour recevoir les cookies
           });
           const data = await response.json();
@@ -66,14 +65,14 @@ const UserProfileModal = ({ show, onHide, user, onLogout, onLLMChange }) => {
 
   const loadUserFiles = async () => {
     try {
-      const response = await fetch(`${config.API_URL}/designer/get_user_files`, {
+      const response = await fetch('http://localhost:8000/designer/get_user_files', {
         credentials: 'include'
       });
       if (response.ok) {
         const data = await response.json();
         // Vérifier les résumés existants pour chaque fichier
         const filesWithSummaryStatus = await Promise.all(data.map(async (file) => {
-          const summaryResponse = await fetch(`${config.API_URL}/designer/get_summary_file/${encodeURIComponent(file.name)}`, {
+          const summaryResponse = await fetch(`http://localhost:8000/designer/get_summary_file/${encodeURIComponent(file.name)}`, {
             credentials: 'include'
           });
           if (summaryResponse.ok) {
@@ -108,7 +107,7 @@ const UserProfileModal = ({ show, onHide, user, onLogout, onLLMChange }) => {
     setError('');
 
     try {
-      const response = await fetch(`${config.API_URL}/designer/upload_user_file/`, {
+      const response = await fetch('http://localhost:8000/designer/upload_user_file/', {
         method: 'POST',
         credentials: 'include',
         body: formData
@@ -131,7 +130,7 @@ const UserProfileModal = ({ show, onHide, user, onLogout, onLLMChange }) => {
 
   const handleDeleteFile = async (filename) => {
     try {
-      const response = await fetch(`${config.API_URL}/designer/delete_user_file/${filename}`, {
+      const response = await fetch(`http://localhost:8000/designer/delete_user_file/${filename}`, {
         method: 'DELETE',
         credentials: 'include'
       });
@@ -162,7 +161,7 @@ const UserProfileModal = ({ show, onHide, user, onLogout, onLLMChange }) => {
 
   const handleLogout = async () => {
     try {
-      const response = await fetch(`${config.API_URL}/auth/logout/`, {
+      const response = await fetch('http://localhost:8000/auth/logout/', {
         method: 'POST',
         credentials: 'include',
       });
@@ -178,7 +177,7 @@ const UserProfileModal = ({ show, onHide, user, onLogout, onLLMChange }) => {
   // Fonction pour charger la liste des utilisateurs
   const loadUsers = async () => {
     try {
-      const response = await fetch(`${config.API_URL}/api/admin/users`, {
+      const response = await fetch('http://localhost:8000/api/admin/users', {
         credentials: 'include'
       });
       if (response.ok) {
@@ -201,7 +200,7 @@ const UserProfileModal = ({ show, onHide, user, onLogout, onLLMChange }) => {
 
   const handleToggleAdmin = async (userId) => {
     try {
-      const response = await fetch(`${config.API_URL}/api/admin/users/${userId}/toggle-admin`, {
+      const response = await fetch(`http://localhost:8000/api/admin/users/${userId}/toggle-admin`, {
         method: 'PUT',
         credentials: 'include'
       });
@@ -217,7 +216,7 @@ const UserProfileModal = ({ show, onHide, user, onLogout, onLLMChange }) => {
 
   const handleToggleActive = async (userId) => {
     try {
-      const response = await fetch(`${config.API_URL}/api/admin/users/${userId}/toggle-active`, {
+      const response = await fetch(`http://localhost:8000/api/admin/users/${userId}/toggle-active`, {
         method: 'PUT',
         credentials: 'include'
       });
@@ -234,7 +233,7 @@ const UserProfileModal = ({ show, onHide, user, onLogout, onLLMChange }) => {
   const handleDeleteUser = async (userId) => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?')) {
       try {
-        const response = await fetch(`${config.API_URL}/api/admin/users/${userId}`, {
+        const response = await fetch(`http://localhost:8000/api/admin/users/${userId}`, {
           method: 'DELETE',
           credentials: 'include'
         });
@@ -253,7 +252,7 @@ const UserProfileModal = ({ show, onHide, user, onLogout, onLLMChange }) => {
     setSummarizingFiles(prev => new Set([...prev, fileName]));
     setError('');
     try {
-      const response = await fetch(`${config.API_URL}/designer/summarize_file/${encodeURIComponent(fileName)}`, {
+      const response = await fetch(`http://localhost:8000/designer/summarize_file/${encodeURIComponent(fileName)}`, {
         method: 'GET',
         credentials: 'include'
       });
@@ -286,7 +285,7 @@ const UserProfileModal = ({ show, onHide, user, onLogout, onLLMChange }) => {
 
   const handleViewSummary = async (fileName) => {
     try {
-      const response = await fetch(`${config.API_URL}/designer/get_summary_file/${encodeURIComponent(fileName)}`, {
+      const response = await fetch(`http://localhost:8000/designer/get_summary_file/${encodeURIComponent(fileName)}`, {
         credentials: 'include'
       });
       

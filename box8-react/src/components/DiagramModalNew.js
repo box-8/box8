@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Button, Form, Alert, Spinner } from 'react-bootstrap';
-import config from '../config';
 
 const DiagramModalNew = ({ show, handleClose, onSave, handleLoadDiagram }) => {
   const [formData, setFormData] = useState({
@@ -53,10 +52,10 @@ const DiagramModalNew = ({ show, handleClose, onSave, handleLoadDiagram }) => {
       // Générer le diagramme dans React Flow
       handleLoadDiagram(emptyDiagram, formData.name);
 
-
+      
       /*
       // Sauvegarder le diagramme vierge
-      const saveResponse = await fetch(`${config.API_URL}/designer/save-diagram`, {
+      const saveResponse = await fetch('http://localhost:8000/designer/save-diagram', {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -96,7 +95,7 @@ const DiagramModalNew = ({ show, handleClose, onSave, handleLoadDiagram }) => {
     setError(null);
 
     try {
-      const generateResponse = await fetch(`${config.API_URL}/designer/generate-diagram`, {
+      const generateResponse = await fetch('http://localhost:8000/designer/generate-diagram', {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -140,7 +139,7 @@ const DiagramModalNew = ({ show, handleClose, onSave, handleLoadDiagram }) => {
       </Modal.Header>
       <Modal.Body>
         {error && <Alert variant="danger">{error}</Alert>}
-
+        
         <Form onSubmit={handleSubmit}>
           <Form.Group className="mb-3">
             <Form.Label>Nom du diagramme</Form.Label>
@@ -162,15 +161,15 @@ const DiagramModalNew = ({ show, handleClose, onSave, handleLoadDiagram }) => {
               placeholder="Décrivez le workflow que vous souhaitez créer..."
             />
             <Form.Text className="text-muted">
-              Décrivez les agents, leurs rôles et les interactions entre eux.
+              Décrivez les agents, leurs rôles et les interactions entre eux. 
               Le système générera automatiquement un diagramme basé sur votre description.
             </Form.Text>
           </Form.Group>
 
           <div className="d-flex flex-column gap-3">
             <div className="d-flex justify-content-center gap-2">
-              <Button
-                variant="outline-primary"
+              <Button 
+                variant="outline-primary" 
                 onClick={handleCreateEmpty}
                 className="w-100"
               >
@@ -186,8 +185,8 @@ const DiagramModalNew = ({ show, handleClose, onSave, handleLoadDiagram }) => {
               <Button variant="secondary" onClick={closeModal}>
                 Annuler
               </Button>
-              <Button
-                variant="primary"
+              <Button 
+                variant="primary" 
                 type="submit"
                 disabled={isGenerating}
               >

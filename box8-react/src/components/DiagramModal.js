@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Button, Form } from 'react-bootstrap';
-import config from '../config';
 
 const DiagramModal = ({ 
   show, 
@@ -41,7 +40,7 @@ const DiagramModal = ({
           ? initialData.name 
           : `${initialData.name}.json`;
 
-        const response = await fetch(`${config.API_URL}/designer/delete-diagram/${fileName}`, {
+        const response = await fetch(`http://localhost:8000/designer/delete-diagram/${fileName}`, {
           method: 'DELETE',
           credentials: 'include',
         });

@@ -131,8 +131,8 @@ async def login_user(response: Response, user_data: UserLogin):
         value=access_token,
         httponly=True,
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        samesite="none",
-        secure=True  # Required for HTTPS
+        samesite="lax",
+        secure=False  # Mettre à True en production avec HTTPS
     )
 
     return {
@@ -195,9 +195,8 @@ async def logout_user(response: Response, session: Optional[str] = Cookie(None))
     response.delete_cookie(
         key="session",
         httponly=True,
-        samesite="none",
-        secure=True,  # Required for HTTPS
-        expires=0  # Add this line to update cookie settings
+        samesite="lax",
+        secure=False  # Mettre à True en production avec HTTPS
     )
     
     return {"message": "Déconnecté avec succès"}

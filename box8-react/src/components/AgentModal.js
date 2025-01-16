@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Button, Form, Tabs, Tab } from 'react-bootstrap';
-import config from '../config'; // Assuming config is in a separate file
 
 const AgentModal = ({ show, onHide, onAdd, onUpdate, onDelete, onSave, selectedNode }) => {
   const [formData, setFormData] = useState({
@@ -18,27 +17,20 @@ const AgentModal = ({ show, onHide, onAdd, onUpdate, onDelete, onSave, selectedN
   useEffect(() => {
     if (show) {
       // Charger la liste des fichiers de l'utilisateur
-      const loadFiles = async () => {
-        try {
-          const response = await fetch(`${config.API_URL}/designer/get_user_files/`, {
-            method: 'GET',
-            credentials: 'include',
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-            },
-          });
-          if (response.ok) {
-            const data = await response.json();
-            setSharePointFiles({ files: data });
-          } else {
-            console.error('Failed to load files');
-          }
-        } catch (error) {
-          console.error('Error loading files:', error);
-        }
-      };
-      loadFiles();
+      fetch('http://localhost:8000/designer/get_user_files/', {
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      })
+        .then(response => response.json())
+        .then(data => {
+          setSharePointFiles({ files: data });
+        })
+        .catch(error => {
+          console.error('Erreur lors du chargement des fichiers:', error);
+        });
     }
   }, [show]);
 

@@ -3,7 +3,6 @@ import Modal from 'react-bootstrap/Modal';
 import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
 import Alert from 'react-bootstrap/Alert';
-import config from '../config';
 
 const LoginModal = ({ show, onHide, onLoginSuccess }) => {
   const [isLoginMode, setIsLoginMode] = useState(true);
@@ -30,7 +29,7 @@ const LoginModal = ({ show, onHide, onLoginSuccess }) => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${config.API_URL}/auth/login/`, {
+      const response = await fetch('http://localhost:8000/auth/login/', {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -83,7 +82,7 @@ const LoginModal = ({ show, onHide, onLoginSuccess }) => {
     }
 
     try {
-      const response = await fetch(`${config.API_URL}/auth/register/`, {
+      const response = await fetch('http://localhost:8000/auth/register/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -25,7 +25,6 @@ import Cookies from 'js-cookie';
 import LoginModal from './components/LoginModal';
 import UserProfileModal from './components/UserProfileModal';
 import LoadingModal from './components/LoadingModal'; // Import the LoadingModal component
-import config from './config';
 
 const nodeTypes = {
   agent: AgentNode,
@@ -87,17 +86,11 @@ function Flow() {
         return;
       }
 
-      websocket = new WebSocket(`${config.WS_URL}/ws/diagram`);
+      websocket = new WebSocket('ws://localhost:8000/ws/diagram');
       
       websocket.onopen = () => {
         console.log('WebSocket Connected');
         setWs(websocket);
-      };
-
-      websocket.onerror = (error) => {
-        console.error('WebSocket Error:', error);
-        // Try to reconnect after 5 seconds
-        reconnectTimeout = setTimeout(connectWebSocket, 5000);
       };
 
       websocket.onmessage = (event) => {
@@ -149,7 +142,7 @@ function Flow() {
     console.log('Checking auth status...'); // Debug
     setIsAuthLoading(true);
     try {
-      const response = await fetch(`${config.API_URL}/auth/check-auth/`, {
+      const response = await fetch('http://localhost:8000/auth/check-auth/', {
         credentials: 'include',
         headers: {
           'Accept': 'application/json',
@@ -211,7 +204,7 @@ function Flow() {
       document.cookie = 'session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
 
       // Send logout request to server
-      const response = await fetch(`${config.API_URL}/auth/logout/`, {
+      const response = await fetch('http://localhost:8000/auth/logout/', {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -528,7 +521,7 @@ function Flow() {
     var csrf = Cookies.get('csrftoken');
 
     // Envoyer la requête au serveur
-    fetch(`${config.API_URL}/designer/launch-crewai/`, {
+    fetch('http://localhost:8000/designer/launch-crewai/', {
       method: 'POST',
       credentials: 'include',
       headers: {
@@ -595,7 +588,7 @@ function Flow() {
     var csrf = Cookies.get('csrftoken');
 
     // Envoyer la requête au serveur
-    fetch(`${config.API_URL}/designer/enhance-diagram/`, {
+    fetch('http://localhost:8000/designer/enhance-diagram/', {
       method: 'POST',
       credentials: 'include',
       headers: {
@@ -731,7 +724,7 @@ function Flow() {
         links: diagramEdges
       };
 
-      const response = await fetch(`${config.API_URL}/designer/save-diagram`, {
+      const response = await fetch('http://localhost:8000/designer/save-diagram', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -774,7 +767,7 @@ function Flow() {
   const handleRefreshDiagram = useCallback(() => {
     if (!currentDiagramName) return;
 
-    fetch(`${config.API_URL}/designer/get-diagram/${currentDiagramName}`, {
+    fetch(`http://localhost:8000/designer/get-diagram/${currentDiagramName}`, {
       method: 'GET',
       credentials: 'include',
       headers: {
@@ -899,7 +892,7 @@ function Flow() {
       if (response.status === 401) {
         // Vérifier si la session est réellement expirée
         try {
-          const authCheck = await fetch(`${config.API_URL}/auth/check-auth/`, {
+          const authCheck = await fetch('http://localhost:8000/auth/check-auth/', {
             credentials: 'include',
             headers: {
               'Accept': 'application/json',
@@ -935,7 +928,7 @@ function Flow() {
   useEffect(() => {
     const fetchCurrentLLM = async () => {
       try {
-        const response = await fetch(`${config.API_URL}/designer/get-llms`, {
+        const response = await fetch('http://localhost:8000/designer/get-llms', {
           credentials: 'include'
         });
         const data = await response.json();

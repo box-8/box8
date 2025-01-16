@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Button, ListGroup } from 'react-bootstrap';
-import config from '../config';
 
 const JsonFilesModal = ({ 
   show, 
@@ -32,7 +31,7 @@ const JsonFilesModal = ({
   }, [show]);
 
   const loadFiles = () => {
-    fetch(`${config.API_URL}/designer/list-json-files`, fetchOptions)
+    fetch('http://localhost:8000/designer/list-json-files', fetchOptions)
       .then(response => response.json())
       .then(data => {
         console.log(data);
@@ -44,7 +43,7 @@ const JsonFilesModal = ({
   const handleFileClick = (filename) => {
     setSelectedFile(filename);
     // Charger le contenu du fichier sélectionné
-    fetch(`${config.API_URL}/designer/get-diagram/${filename}`, fetchOptions)
+    fetch(`http://localhost:8000/designer/get-diagram/${filename}`, fetchOptions)
       .then(response => response.json())
       .then(data => {
         console.log(data);
@@ -56,7 +55,7 @@ const JsonFilesModal = ({
   const handleFileDoubleClick = (filename) => {
     handleFileClick(filename);
     // Attendre que le contenu soit chargé avant de fermer le modal
-    fetch(`${config.API_URL}/designer/get-diagram/${filename}`, fetchOptions)
+    fetch(`http://localhost:8000/designer/get-diagram/${filename}`, fetchOptions)
       .then(response => response.json())
       .then(data => {
         onFileSelect(data, filename);
@@ -105,7 +104,7 @@ const JsonFilesModal = ({
     if (window.confirm(`Êtes-vous sûr de vouloir supprimer le diagramme "${selectedFile}" ?`)) {
       setIsDeleting(true);
       try {
-        const response = await fetch(`${config.API_URL}/designer/delete-diagram/${selectedFile}`, {
+        const response = await fetch(`http://localhost:8000/designer/delete-diagram/${selectedFile}`, {
           method: 'DELETE',
           credentials: 'include',
         });
